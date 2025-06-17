@@ -210,7 +210,7 @@ lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
 
 % splitting the input data for training and validation
 numSamples = size(inputData, 4);
-splitRatio = 0.8;
+splitRatio = 0.8; % 80% of the inputData will be for training, 20% will be used for validation
 numTrain = round(splitRatio * numSamples);
 idx = randperm(numSamples); 
 trainIdx = idx(1:numTrain);
