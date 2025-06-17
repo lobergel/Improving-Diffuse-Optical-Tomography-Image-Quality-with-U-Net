@@ -2,14 +2,14 @@ clear; close all;
 
 load("diff_MuaReconstructedData.mat"); load("diff_MuaTargetData.mat")
 load("diff_MusReconstructedData.mat"); load("diff_MusTargetData.mat")
-% inputData = musGridMatrix; 
-
 res = 32;
 %% 
-
 inputDataScaled = (muareconMatrix - min(muareconMatrix(:))) / (max(muareconMatrix(:)) - min(muareconMatrix(:)));
 
-% normalizing input and target matrices
+% number of images in the input data set 
+numImages = size(inputDataScaled, 3); 
+
+% normalizing input and target matrices (helps the network) 
 input_mua = (muareconMatrix - min(muareconMatrix(:))) / ...
             (max(muareconMatrix(:)) - min(muareconMatrix(:)));
 input_mus = (muspreconMatrix - min(muspreconMatrix(:))) / ...
@@ -21,15 +21,12 @@ target_mus = (mustargetMatrix - min(mustargetMatrix(:))) / ...
              (max(mustargetMatrix(:)) - min(mustargetMatrix(:)));
 
 % combining input and target into 2-channel format
-inputData = cat(3, input_mua, input_mus);      % [res, res, 2, N]
-targetData = cat(3, target_mua, target_mus);   % [res, res, 2, N]
+inputData = cat(3, input_mua, input_mus);     
+targetData = cat(3, target_mua, target_mus); 
 
 % reshaping for datastore use
 inputData = reshape(inputData, res, res, 2, []);
 targetData = reshape(targetData, res, res, 2, []);
-
-% number of images in the input data set
-numImages = size(inputDataScaled, 3); 
 
 inputDS = arrayDatastore(inputData, 'IterationDimension', 4);
 targetDS = arrayDatastore(targetData, 'IterationDimension', 4);
@@ -48,7 +45,7 @@ inputLayer = imageInputLayer([32 32 2], 'Name', 'input');
 
 % encoder
 enc1 = [
-    convolution2dLayer(3, 64, 'Padding', 'same', 'Name', 'enc1_conv1')
+    convolution2dLayer(3, 64, 'Padding', 'same', 'Name', 'enc1_conv1') % starts with 64 filters instead of 32 
     batchNormalizationLayer('Name', 'enc1_bn1')
     reluLayer('Name', 'enc1_relu1')
     
@@ -204,7 +201,7 @@ lgraph = connectLayers(lgraph, 'enc1_relu2', 'dec1_concat/in2');
 % output connection
 lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
 
-% analyzeNetwork(lgraph) 
+% analyzeNetwork(lgraph) % shows networks structure 
 
 %% creating validation data
 
@@ -212,7 +209,7 @@ lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
 numSamples = size(inputData, 4);
 splitRatio = 0.8; % 80% of the inputData will be for training, 20% will be used for validation
 numTrain = round(splitRatio * numSamples);
-idx = randperm(numSamples); 
+idx = randperm(numSamples); % training data and validation data are chosen randomly 
 trainIdx = idx(1:numTrain);
 valIdx = idx(numTrain+1:end);
 
@@ -230,7 +227,7 @@ inputValDS = arrayDatastore(inputVal, 'IterationDimension', 4);
 targetValDS = arrayDatastore(targetVal, 'IterationDimension', 4);
 valDS = combine(inputValDS, targetValDS);
 
-%% specifying the training options and training the net
+%% specifying the training options and training the net 
 options = trainingOptions('adam', ...
     'MaxEpochs', 50, ...
     'InitialLearnRate', 1e-4, ...
@@ -239,8 +236,7 @@ options = trainingOptions('adam', ...
     'Verbose', false, ...
     'ValidationData', valDS, ...
     'ValidationFrequency', 250, ...
-    'ExecutionEnvironment', 'gpu');
-
+    'ExecutionEnvironment', 'gpu'); % is GPU is not available use 'parallel' or 'cpu' 
 
 % training the net accoring to the options 
 [diffNetRandInput, diffNetRandInputInfo] = trainNetwork(trainDS, lgraph, options);
@@ -248,23 +244,5 @@ options = trainingOptions('adam', ...
 % saving trained net 
 save('DiffDeblurringUnet.mat', 'diffNetRandInput', 'lgraph');
 
-%% test and display prediction for a random image from the set 
-testIdx = randi([1 size(inputVal, 4)]);
-testImg = inputVal(:, :, :, testIdx);
-targetImg = targetVal(:, :, :, testIdx);
-
-% making a prediction using the net 
-predicted = predict(diffNetRandInput, testImg);
-
-% displaying the predictions 
-% figure;
-
-% % mu_a (channel 1)
-% subplot(2, 3, 1); imshow(testImg(:,:,1), []); title('Input \delta\mu_a');
-% subplot(2, 3, 2); imshow(predicted(:,:,1), []); title('Predicted \delta\mu_a');
-% subplot(2, 3, 3); imshow(targetImg(:,:,1), []); title('Ground Truth \delta\mu_a');
-% 
-% % mu_s (channel 2)
-% subplot(2, 3, 4); imshow(testImg(:,:,2), []); title('Input \delta\mu_s');
-% subplot(2, 3, 5); imshow(predicted(:,:,2), []); title('Predicted \delta\mu_s');
-% subplot(2, 3, 6); imshow(targetImg(:,:,2), []); title('Ground Truth \delta\mu_s');
+% displaying a confirmation message
+disp('Done.');
