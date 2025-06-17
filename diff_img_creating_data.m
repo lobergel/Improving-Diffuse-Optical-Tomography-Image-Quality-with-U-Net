@@ -129,7 +129,7 @@ for i = 1:numOfData
 
     deltay = y - y0;
 
-    % random Gaussian noise 
+    % random percentage of Gaussian noise 
     noise = 0.005 + (0.015 - 0.005) * rand(); % [0.005, 0.015]
     deltay = deltay + noise * randn(length(deltay), 1) .* abs(deltay);
 
