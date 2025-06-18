@@ -12,7 +12,7 @@ filename_mus_target = 'diff_MusTargetData.mat';
 ths = (0 : 2*pi/N : 2 * pi)'; % range for sources
 sp = [25*cos(ths) 25*sin(ths)]; % sources on unit circle with radius 25 
 
-thd = (pi/N : 2*pi/N : 2 * pi)'; % range for detectors 
+thd = (pi/N : 2*pi/N : 2 * pi)'; % range for detectors (starts at pi/N to avoid overlapping)
 mp = [25*cos(thd) 25*sin(thd)]; % detectors on unit circle with radius 25 
 
 % setting up a mesh 
@@ -68,28 +68,28 @@ end
 %% loop 
 for i = 1:numOfData
     % load mesh data
-    [vtx, elem, ~] = hMesh.Data;
-    n = size(vtx, 1);
+    [vtx, elem, ~] = hMesh.Data; % extracting mesh data
+    n = size(vtx, 1); % node count
 
-    % random inclusion 1 (scattering)
-    r1 = randi([3 12]); % [3, 12]
-    cx1 = -18 + 36 * rand(); % [-18, 18]
-    cy1 = -18 + 36 * rand(); % [-18, 18]
-    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1);
+    % inclusion 1 (scattering)
+    r1 = randi([3 12]); % integer radius for inclusion 1, range [3, 12]
+    cx1 = -18 + 36 * rand(); % x-coordinate for inclusion 1, range [-18, 18]
+    cy1 = -18 + 36 * rand(); % y-coordinate for inclusion 1, range [-18, 18]
+    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1); % indexes from mus that correspond with inclusion 1
 
-    % Random inclusion 2 (absorption)
+    % inclusion 2 (absorption)
     r2 = randi([3 12]); % [3,12]
     cx2 = -18 + 36 * rand(); % [-18, 18]
     cy2 = -18 + 36 * rand(); % [-18, 18]
     Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2);
 
-    % Random inclusion 3 (another absorption)
+    % inclusion 3 (another absorption)
     r3 = randi([3 12]);
     cx3 = -18 + 36 * rand();
     cy3 = -18 + 36 * rand();
     Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3);
 
-    % Random inclusion 4 (another scattering)
+    % inclusion 4 (another scattering)
     r4 = randi([3 12]);
     cx4 = -18 + 36 * rand();
     cy4 = -18 + 36 * rand();
