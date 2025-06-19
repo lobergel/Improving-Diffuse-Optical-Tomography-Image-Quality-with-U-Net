@@ -21,12 +21,11 @@ target_mus = (mustargetMatrix - min(mustargetMatrix(:))) / ...
              (max(mustargetMatrix(:)) - min(mustargetMatrix(:)));
 
 % combining input and target into 2-channel format
-inputData = cat(3, input_mua, input_mus);     
-targetData = cat(3, target_mua, target_mus); 
+inputData = cat(4, input_mua, input_mus);  % [res × res × numImages × 2]
+inputData = permute(inputData, [1 2 4 3]); % -> [res × res × 2 × numImages]
 
-% reshaping for datastore use
-inputData = reshape(inputData, res, res, 2, []);
-targetData = reshape(targetData, res, res, 2, []);
+targetData = cat(4, target_mua, target_mus);  
+targetData = permute(targetData, [1 2 4 3]); 
 
 inputDS = arrayDatastore(inputData, 'IterationDimension', 4);
 targetDS = arrayDatastore(targetData, 'IterationDimension', 4);
@@ -239,10 +238,10 @@ options = trainingOptions('adam', ...
     'ExecutionEnvironment', 'gpu'); % is GPU is not available use 'parallel' or 'cpu' 
 
 % training the net accoring to the options 
-[diffNetRandInput, diffNetRandInputInfo] = trainNetwork(trainDS, lgraph, options);
+[net, info] = trainNetwork(trainDS, lgraph, options);
 
 % saving trained net 
-save('DiffDeblurringUnet.mat', 'diffNetRandInput', 'lgraph');
+save('unet.mat', 'net', 'lgraph');
 
 % displaying a confirmation message
 disp('Done.');
