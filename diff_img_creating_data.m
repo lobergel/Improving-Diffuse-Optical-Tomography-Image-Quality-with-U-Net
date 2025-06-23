@@ -1,19 +1,20 @@
-close all; clear all;
+close; clear all;
 
 N = 16; % number of sources (and number of detectors) in range [0, 2pi]
-res = 32; % resolution for reconstructions
+res = 32; % resolution of output grid (res x res)
+numOfData = 1000; % number of iteration in the for-loop (how many res x res matrices are created)
 
 % filenames for reconstruction and target matrices 
-filename_mua_recon = 'diff_MuaReconstructedData.mat';
-filename_mus_recon = 'diff_MusReconstructedData.mat';
-filename_mua_target = 'diff_MuaTargetData.mat';
-filename_mus_target = 'diff_MusTargetData.mat';
+filename_mua_recon = '360_mua_recon.mat';
+filename_mus_recon = '360_mus_recon.mat';
+filename_mua_target = '360_mua_target.mat';
+filename_mus_target = '360_mus_target.mat';
 
-ths = (0 : 2*pi/N : 2 * pi)'; % range for sources
-sp = [25*cos(ths) 25*sin(ths)]; % sources on unit circle with radius 25 
+ths = (0 : 2*pi/N : 2 * pi)'; % source angles 
+sp = [25*cos(ths) 25*sin(ths)]; % source positions in circle
 
-thd = (pi/N : 2*pi/N : 2 * pi)'; % range for detectors (starts at pi/N to avoid overlapping)
-mp = [25*cos(thd) 25*sin(thd)]; % detectors on unit circle with radius 25 
+thd = (pi/N : 2*pi/N : 2 * pi)'; % detector angles with offset 
+mp = [25*cos(thd) 25*sin(thd)]; % detector positions in circle 
 
 % setting up a mesh 
 meshname = 'mesh2D_r28.msh';
@@ -29,44 +30,44 @@ qvec = hMesh.Qvec('Neumann', 'Gaussian', 2);
 mvec = hMesh.Mvec('Gaussian', 2, 1.4);
 ref = ones(hMesh.NodeCount(), 1) * 1.4;
 
-% number of iteration in the for-loop (how many res x res matrices are created)
-numOfData = 1000;
-
 % check and load existing files if they exist (prevents overwriting) 
 if isfile(filename_mua_recon)
-    load(filename_mua_recon, 'muareconMatrix');
-    nExistingMua = size(muareconMatrix, 3);
+    load(filename_mua_recon, 'musreconSet');
+    nExistingMua = size(musreconSet, 3);    
 else
-    muareconMatrix = [];
+    musreconSet = [];
     nExistingMua = 0;
 end
 
 if isfile(filename_mus_recon)
-    load(filename_mus_recon, 'muspreconMatrix');
-    nExistingMus = size(muspreconMatrix, 3);
+    load(filename_mus_recon, 'muspreconSet');
+    nExistingMus = size(muspreconSet, 3);
 else
-    muspreconMatrix = [];
+    muspreconSet = [];
     nExistingMus = 0;
 end
 
 if isfile(filename_mua_target)
-    load(filename_mua_target, 'muatargetMatrix');
-    nExistingMuaTarget = size(muatargetMatrix, 3);
+    load(filename_mua_target, 'muatargetSet');
+    nExistingMuaTarget = size(muatargetSet, 3);
 else
-    muatargetMatrix = [];
+    muatargetSet = [];
     nExistingMuaTarget = 0;
 end
 
 if isfile(filename_mus_target)
-    load(filename_mus_target, 'mustargetMatrix');
-    nExistingMusTarget = size(mustargetMatrix, 3);
+    load(filename_mus_target, 'mustargetSet');
+    nExistingMusTarget = size(mustargetSet, 3);
 else
-    mustargetMatrix = [];
+    mustargetSet = [];
     nExistingMusTarget = 0;
 end
 
 %% loop 
-for i = 1:numOfData
+
+rng('shuffle');
+
+for i = 1:numOfData    
     % load mesh data
     [vtx, elem, ~] = hMesh.Data; % extracting mesh data
     n = size(vtx, 1); % node count
@@ -155,55 +156,47 @@ for i = 1:numOfData
     muatargetGrid = rot90(reshape(hBasis.Map('M->B', dmuatgt), [res, res]), 1);
     mustargetGrid = rot90(reshape(hBasis.Map('M->B', dmustgt), [res, res]), 1);
 
-    muareconMatrix(:, :, nExistingMua + i) = muareconGrid;
-    muspreconMatrix(:, :, nExistingMus + i) = muspreconGrid;
-    muatargetMatrix(:, :, nExistingMuaTarget + i) = muatargetGrid;
-    mustargetMatrix(:, :, nExistingMusTarget + i) = mustargetGrid;
+    % appending matrices 
+    musreconSet(:, :, nExistingMua + i) = muareconGrid;
+    muspreconSet(:, :, nExistingMus + i) = muspreconGrid;
+    muatargetSet(:, :, nExistingMuaTarget + i) = muatargetGrid;
+    mustargetSet(:, :, nExistingMusTarget + i) = mustargetGrid;
 
-    fprintf('Iteration %d completed.\n', i);
+    fprintf('Iteration %d completed.\n', i); % (optional line) 
 end
 
 % save all reconstructions and targets
-save(filename_mua_recon, 'muareconMatrix');
-save(filename_mus_recon, 'muspreconMatrix');
-save(filename_mua_target, 'muatargetMatrix');
-save(filename_mus_target, 'mustargetMatrix');
+save(filename_mua_recon, 'musreconSet');
+save(filename_mus_recon, 'muspreconSet');
+save(filename_mua_target, 'muatargetSet');
+save(filename_mus_target, 'mustargetSet');
 
 %% testing the set of data (optional)
-% figure;
-numImages = size(muareconMatrix, 3);
-fprintf("File %s has %d reconstructions.\n", filename_mua_recon, numImages); % all files should have the same amount of matrices 
+numImages = size(musreconSet, 3);
+fprintf("Files have %d reconstructions.\n", numImages); % all files should have the same amount of matrices 
 
 % loop displays 4 random reconstructions and their targets from the newest set of reconstructions 
+figure;
 for i = 1:4
     randIndex = randi([numImages-numOfData numImages]); % index value from the newest reconstructions 
 
-    subplot(4, 4, (i-1)*4 + 1); 
-    imagesc(muareconMatrix(:, :, randIndex));
-    axis equal tight off;
-    colorbar;
-    colormap(1 - gray);
-    title(['\delta\mu_a Sample ' num2str(randIndex)]);
-
-    subplot(4, 4, (i-1)*4 + 2); 
-    imagesc(muatargetMatrix(:, :, randIndex));
-    axis equal tight off;
-    colorbar;
-    colormap(1 - gray);
-    title(['\delta\mu_a Target ' num2str(randIndex)]);
-
-    subplot(4, 4, (i-1)*4 + 3); 
-    imagesc(muspreconMatrix(:, :, randIndex));
-    axis equal tight off;
-    colorbar;
-    colormap(1 - gray);
-    title(['\delta\mu_s Sample ' num2str(randIndex)]);
-
-    subplot(4, 4, (i-1)*4 + 4);
-    imagesc(mustargetMatrix(:, :, randIndex));
-    axis equal tight off;
-    colorbar;
-    colormap(1 - gray);
-    title(['\delta\mu_s Target ' num2str(randIndex)]);
+    subplot(4, 4, (i-1)*4 + 1); imagesc(musreconSet(:, :, randIndex)); axis equal tight off; colorbar; colormap(1 - gray); title(['\delta\mu_a Sample ' num2str(randIndex)]);
+    subplot(4, 4, (i-1)*4 + 2); imagesc(muatargetSet(:, :, randIndex)); axis equal tight off; colorbar; colormap(1 - gray); title(['\delta\mu_a Target ' num2str(randIndex)]);
+    subplot(4, 4, (i-1)*4 + 3); imagesc(muspreconSet(:, :, randIndex)); axis equal tight off; colorbar; colormap(1 - gray); title(['\delta\mu_s Sample ' num2str(randIndex)]); 
+    subplot(4, 4, (i-1)*4 + 4); imagesc(mustargetSet(:, :, randIndex)); axis equal tight off; colorbar; colormap(1 - gray); title(['\delta\mu_s Target ' num2str(randIndex)]);
 end
 
+%% saving global min/max values for visualization scaling
+
+filename_scale_mua = 'mua_scale';
+filename_scale_mus = 'mus_scale';
+
+mua_max = max([muareconSet(:); muatargetSet(:)]); 
+mua_min = min([muareconSet(:); muatargetSet(:)]);
+
+mus_max = max([muspreconSet(:); mustargetSet(:)]);
+mus_min = min([muspreconSet(:); mustargetSet(:)]);
+
+save(filename_scale_mua, "mua_max", "mua_min");
+save(filename_scale_mus, "mus_max", "mus_min"); 
+   
