@@ -62,7 +62,7 @@ dsTrain = combine(inputDS, targetDS);
 % validation data and targets 
 inputValDS = arrayDatastore(inputVal, 'IterationDimension', 4);
 targetValDS = arrayDatastore(targetVal, 'IterationDimension', 4);
-dsVal = combine(inputValDS, targetValDS);
+valDS = combine(inputValDS, targetValDS);
 
 %% building the network 
 
@@ -126,11 +126,14 @@ bottleneck = [
     convolution2dLayer(3, 1024, 'Padding', 'same', 'Name', 'bottleneck_conv1')
     batchNormalizationLayer('Name', 'bottleneck_bn1')
     reluLayer('Name', 'bottleneck_relu1')
-
+    
     convolution2dLayer(3, 1024, 'Padding', 'same', 'Name', 'bottleneck_conv2')
     batchNormalizationLayer('Name', 'bottleneck_bn2')
     reluLayer('Name', 'bottleneck_relu2')
 
+    dropoutLayer(0.25, 'Name', 'bottleneck_dropout')  % diables 25% of neurons randomly to prevent overfitting -> net doesn't depend on specific neurons 
+    % source: https://www.mdpi.com/2079-9292/11/3/305#:~:text=Following%20this%20process%2C%20the%20feature%20maps%20enter%20a%20batch%20normalization%20and%20ReLU%20activation%20layer.%20After%20which%2C%20they%20pass%20through%20a%20dropout%20layer%20(25%25%20dropout).
+    
     transposedConv2dLayer(2, 512, 'Stride', 2, 'Name', 'bottleneck_up')
     reluLayer('Name', 'bottleneck_relu3')
 ];
