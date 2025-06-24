@@ -94,26 +94,26 @@ for i = 1:numOfData
 
     % inclusion 1 (scattering)
     angle1 = mod(start_angle1 + (i - 1) * angle_step, 2*pi);
-    r1 = randi([3 7]); 
+    r1 = randi([3 5]); 
     cx1 = R * cos(angle1);
     cy1 = R * sin(angle1);
     Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1);
 
     % inclusion 2 (absorption)
     angle2 = mod(start_angle2 + (i - 1) * angle_step, 2*pi);
-    r2 = randi([3 7]); 
+    r2 = randi([3 5]); 
     cx2 = R * cos(angle2);
     cy2 = R * sin(angle2);
     Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2);
 
     % inclusion 3 (another absorption)
-    % r3 = randi([3 7]);
+    % r3 = randi([3 5]);
     % cx3 = R * cos(angle3);
     % cy3 = R * sin(angle3);
     % Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3);
     
     % inclusion 4 (another scattering)
-    % r4 = randi([3 7]);
+    % r4 = randi([3 5]);
     % cx4 = R * cos(angle4);
     % cy4 = R * sin(angle4);
     % Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4);
@@ -129,7 +129,7 @@ for i = 1:numOfData
     % mus(Index4) = 0.5 + (1.5 - 0.5) * rand(); % [0.5, 1.5]
 
     mua(Index2) = 0.005 + (0.02 - 0.005) * rand(); % [0.005, 0.05], -> [0.005, 0.02]
-    % mua(Index3) = 0.005 + (0.05 - 0.005) * rand(); % [0.005, 0.05]
+    % mua(Index3) = 0.005 + (0.02 - 0.005) * rand(); % [0.005, 0.05]
 
     dmuatgt = mua - mua0;
     dmustgt = mus - mus0;
