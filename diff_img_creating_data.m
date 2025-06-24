@@ -32,10 +32,10 @@ ref = ones(hMesh.NodeCount(), 1) * 1.4;
 
 % check and load existing files if they exist (prevents overwriting) 
 if isfile(filename_mua_recon)
-    load(filename_mua_recon, 'musreconSet');
-    nExistingMua = size(musreconSet, 3);    
+    load(filename_mua_recon, 'muareconSet');
+    nExistingMua = size(muareconSet, 3);
 else
-    musreconSet = [];
+    muareconSet = [];
     nExistingMua = 0;
 end
 
