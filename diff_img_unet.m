@@ -1,24 +1,33 @@
 clear; close all;
 
-load("diff_MuaReconstructedData.mat"); load("diff_MuaTargetData.mat")
-load("diff_MusReconstructedData.mat"); load("diff_MusTargetData.mat")
+load("360_mua_recon.mat"); load("360_mua_target.mat")
+muareconMatrix = muareconSet;
+muatargetMatrix = muatargetSet;
+
+load("360_mus_recon.mat"); load("360_mus_target.mat")
+muspreconMatrix = muspreconSet;
+mustargetMatrix = mustargetSet;
+
+load("360_mua_valid_recon.mat"); load("360_mua_valid_target.mat")
+muaValReconSet = muareconSet; 
+muaValiTargetSet = muatargetSet;
+
+load("360_mus_valid_recon.mat"); load("360_mus_valid_target.mat")
+musValReconSet = muspreconSet;
+musValTargetSet = mustargetSet;
+
+load("mua_scale.mat"); load("mus_scale.mat")
+
 res = 32;
 %% 
-inputDataScaled = (muareconMatrix - min(muareconMatrix(:))) / (max(muareconMatrix(:)) - min(muareconMatrix(:)));
-
-% number of images in the input data set 
-numImages = size(inputDataScaled, 3); 
+% number of images in the input data set(s)
+numImages = size(muareconMatrix, 3); 
 
 % normalizing input and target matrices (helps the network) 
-input_mua = (muareconMatrix - min(muareconMatrix(:))) / ...
-            (max(muareconMatrix(:)) - min(muareconMatrix(:)));
-input_mus = (muspreconMatrix - min(muspreconMatrix(:))) / ...
-            (max(muspreconMatrix(:)) - min(muspreconMatrix(:)));
-
-target_mua = (muatargetMatrix - min(muatargetMatrix(:))) / ...
-             (max(muatargetMatrix(:)) - min(muatargetMatrix(:)));
-target_mus = (mustargetMatrix - min(mustargetMatrix(:))) / ...
-             (max(mustargetMatrix(:)) - min(mustargetMatrix(:)));
+input_mua = rescale(muareconMatrix, mua_min, mua_max);
+input_mus = rescale(muspreconMatrix, mus_min, mus_max);
+target_mua = rescale(muatargetMatrix, mua_min, mua_max);
+target_mus = rescale(mustargetMatrix, mus_min, mus_max);
 
 % combining input and target into 2-channel format
 inputData = cat(4, input_mua, input_mus);  % [res × res × numImages × 2]
@@ -27,16 +36,37 @@ inputData = permute(inputData, [1 2 4 3]); % -> [res × res × 2 × numImages]
 targetData = cat(4, target_mua, target_mus);  
 targetData = permute(targetData, [1 2 4 3]); 
 
+% validation data
+input_mua_val = rescale(muaValReconSet, mua_min, mua_max);
+input_mus_val = rescale(musValReconSet, mus_min, mus_max);
+
+target_mua_val = rescale(muaValiTargetSet, mua_min, mua_max);
+target_mus_val = rescale(musValTargetSet, mus_min, mus_max);
+
+inputVal = cat(4, input_mua_val, input_mus_val);
+inputVal = permute(inputVal, [1 2 4 3]); 
+
+targetVal = cat(4, target_mua_val, target_mus_val);
+targetVal = permute(targetVal, [1 2 4 3]);
+
+% source: 
+% https://stackoverflow.com/questions/52527210/how-to-make-training-data-as-a-4-d-array-in-neural-network-matlab-proper-way-t
+
+%% combining datastores 
+
+% input data and targets 
 inputDS = arrayDatastore(inputData, 'IterationDimension', 4);
 targetDS = arrayDatastore(targetData, 'IterationDimension', 4);
 dsTrain = combine(inputDS, targetDS);
 
+% validation data and targets 
+inputValDS = arrayDatastore(inputVal, 'IterationDimension', 4);
+targetValDS = arrayDatastore(targetVal, 'IterationDimension', 4);
+dsVal = combine(inputValDS, targetValDS);
+
 %% building the network 
 
 % built-in layers (https://se.mathworks.com/help/deeplearning/builtin-layers.html)
-% layers are made to be similar to the U-net architecture in the U-net
-% article 
-
 % compare to this: https://github.com/prafful-kumar/Blurred-Image-Recognition/blob/main/Deblurring_U_NET(Keras).ipynb
 
 % input layer
@@ -202,30 +232,6 @@ lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
 
 % analyzeNetwork(lgraph) % shows networks structure 
 
-%% creating validation data
-
-% splitting the input data for training and validation
-numSamples = size(inputData, 4);
-splitRatio = 0.8; % 80% of the inputData will be for training, 20% will be used for validation
-numTrain = round(splitRatio * numSamples);
-idx = randperm(numSamples); % training data and validation data are chosen randomly 
-trainIdx = idx(1:numTrain);
-valIdx = idx(numTrain+1:end);
-
-% training data
-inputTrain = inputData(:,:,:,trainIdx);
-targetTrain = targetData(:,:,:,trainIdx);
-inputTrainDS = arrayDatastore(inputTrain, 'IterationDimension', 4);
-targetTrainDS = arrayDatastore(targetTrain, 'IterationDimension', 4);
-trainDS = combine(inputTrainDS, targetTrainDS);
-
-% validation data
-inputVal = inputData(:,:,:,valIdx);
-targetVal = targetData(:,:,:,valIdx);
-inputValDS = arrayDatastore(inputVal, 'IterationDimension', 4);
-targetValDS = arrayDatastore(targetVal, 'IterationDimension', 4);
-valDS = combine(inputValDS, targetValDS);
-
 %% specifying the training options and training the net 
 options = trainingOptions('adam', ...
     'MaxEpochs', 50, ...
@@ -241,7 +247,7 @@ options = trainingOptions('adam', ...
 [net, info] = trainNetwork(trainDS, lgraph, options);
 
 % saving trained net 
-save('unet.mat', 'net', 'lgraph');
+save('unet.mat', 'net', 'info');
 
 % displaying a confirmation message
 disp('Done.');
