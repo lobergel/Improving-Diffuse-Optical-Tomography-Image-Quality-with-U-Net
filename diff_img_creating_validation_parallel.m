@@ -21,7 +21,7 @@ sp = [25*cos(ths) 25*sin(ths)];
 thd = (pi/N : 2*pi/N : 2 * pi)';
 mp = [25*cos(thd) 25*sin(thd)];
 
-% loading mesh data
+% loading mesh, setting sources and detectors to mesh 
 meshname = 'mesh2D_r28.msh';
 meshpath = 'meshfiles/';
 hMesh = toastMesh([meshpath meshname]);
@@ -75,7 +75,7 @@ mustargetSet_new = zeros(res, res, numOfData);
 %% loop 
 rng('shuffle');
 
-% change in angle between iterations 
+% change in angle between iterations, all inclusions have the same angle step to help prevent overlapping 
 angle_step = deg2rad(55); 
 
 % starting positions of inclusions 
@@ -113,60 +113,64 @@ parfor i = 1:numOfData
     [vtx, elem, ~] = hMesh_local.Data;
     n = size(vtx, 1);
 
-    % inclusion 1 (scattering)
-    angle1 = mod(start_angle1 + (i - 1) * angle_step, 2*pi);
-    r1 = randi([3 5]); % [3, 12]
-    cx1 = R * cos(angle1);
-    cy1 = R * sin(angle1);
-    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1);
+    % inclusion 1 
+    angle1 = mod(start_angle1 + (i - 1) * angle_step, 2*pi); % starting angle for inclusion 1
+    r1 = randi([3 5]); % radius for inclusion 1
+    cx1 = R * cos(angle1); % x-coordinate 
+    cy1 = R * sin(angle1); % y-coordinate
+    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1); % index values that fall within radius r1
 
-    % inclusion 2 (absorption)
+    % inclusion 2 
     angle2 = mod(start_angle2 + (i - 1) * angle_step, 2*pi);
-    r2 = randi([3 5]); % [3,12]
+    r2 = randi([3 5]); 
     cx2 = R * cos(angle2);
     cy2 = R * sin(angle2);
     Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2);
-
-    angle3 = mod(start_angle3 + (i - 1) * angle_step, 2*pi);
-    % inclusion 3 (another absorption)
-    r3 = randi([3 5]);
-    cx3 = R * cos(angle3);
-    cy3 = R * sin(angle3);
-    Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3);
     
-    angle4 = mod(start_angle4 + (i - 1) * angle_step, 2*pi);
-    % inclusion 4 (another scattering)
-    r4 = randi([3 5]);
-    cx4 = R * cos(angle4);
-    cy4 = R * sin(angle4);
-    Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4);
-
     % background values 
     mua0 = 0.01; 
     mus0 = 1;
-
+    
     mus = mus0 * ones(n,1);
     mua = mua0 * ones(n,1);
 
-    % adding inclusions with random coefficients 
+    % adding inclusions with random coefficients
+    % indexes in mus are scattering inclusions, in mua absorbing inclusions
     mus(Index1) = 0.5 + (1.5 - 0.5) * rand(); % [0.5, 1.5]
-    mus(Index4) = 0.5 + (1.5 - 0.5) * rand(); % [0.5, 1.5]
-
     mua(Index2) = 0.005 + (0.02 - 0.005) * rand(); % [0.005, 0.02]
-    mua(Index3) = 0.005 + (0.02 - 0.005) * rand(); % [0.005, 0.02]
 
+    % inclusion 3 
+    if (randi[0 1])
+        angle3 = mod(start_angle3 + (i - 1) * angle_step, 2*pi);
+        r3 = randi([3 5]);
+        cx3 = R * cos(angle3);
+        cy3 = R * sin(angle3);
+        Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3);
+        mua(Index3) = 0.005 + (0.02 - 0.005) * rand(); % [0.005, 0.02]
+    end 
+    
+    % inclusion 4 
+    if (randi[0 1])
+        angle4 = mod(start_angle4 + (i - 1) * angle_step, 2*pi);
+        r4 = randi([3 5]);
+        cx4 = R * cos(angle4);
+        cy4 = R * sin(angle4);
+        Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4);
+        mus(Index4) = 0.5 + (1.5 - 0.5) * rand(); % [0.5, 1.5]
+    end
+    
     % difference from background values 
     dmuatgt = mua - mua0;
     dmustgt = mus - mus0;
 
-    % ... 
+    % measurements with inclusions 
     freq = 100; % MHz
     K = dotSysmat(hMesh_local, mua, mus, ref, freq);
     phi = K \ qvec;
     gamma = mvec.' * phi;
     y = [real(log(gamma(:))); imag(log(gamma(:)))];
 
-    % reference values 
+    % reference values without inclusions 
     mus_ref = mus0 * ones(n,1);
     mua_ref = mua0 * ones(n,1);
     K0 = dotSysmat(hMesh_local, mua_ref, mus_ref, ref, freq);
@@ -174,18 +178,19 @@ parfor i = 1:numOfData
     gamma0 = mvec.' * phi0;
     y0 = [real(log(gamma0(:))); imag(log(gamma0(:)))];
 
+    % difference in ... 
     deltay = y - y0;
 
     % random percentage of Gaussian noise 
     noise = 0.005 + (0.015 - 0.005) * rand(); % [0.005, 0.015]
     deltay = deltay + noise * randn(length(deltay), 1) .* abs(deltay);
 
-    % ... 
+    % Jacobian 
     J = toastJacobian(hMesh_local, [], qvec, mvec, mua_ref, mus_ref, ref, freq);
     stdn = noise * abs(y);
     Le = diag(1 ./ stdn);
 
-    % ... 
+    % prior 
     r_prior = 8;
     prior_std_mua = mua0 / 10;
     prior_std_mus = mus0 / 10;
@@ -193,12 +198,12 @@ parfor i = 1:numOfData
     Lxmus = PriorOrnsteinUhlenbeck(struct('g', vtx), prior_std_mus, r_prior);
     Lx = [Lxmua sparse(n,n); sparse(n,n) Lxmus];
 
-    % ... 
+    % solving the system 
     x = ([Le * J; Lx]) \ ([Le * deltay; zeros(2 * n, 1)]);
     muarecon = x(1:n);
     musprecon = x(n+1:end);
 
-    % transfering images from mesh to grid 
+    % transfering images from mesh to grid and rotating 
     muareconGrid = rot90(reshape(hBasis_local.Map('M->B', muarecon), [res, res]), 1);
     muspreconGrid = rot90(reshape(hBasis_local.Map('M->B', musprecon), [res, res]), 1);
     muatargetGrid = rot90(reshape(hBasis_local.Map('M->B', dmuatgt), [res, res]), 1);
