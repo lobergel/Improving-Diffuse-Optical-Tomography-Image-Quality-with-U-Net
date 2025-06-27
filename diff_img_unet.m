@@ -16,18 +16,17 @@ load("360_mus_valid_recon.mat"); load("360_mus_valid_target.mat")
 musValReconSet = muspreconSet;
 musValTargetSet = mustargetSet;
 
-load("mua_scale.mat"); load("mus_scale.mat")
-
 res = 32;
 %% 
 % number of images in the input data set(s)
 numImages = size(muareconMatrix, 3); 
 
-% normalizing input and target matrices (helps the network) 
-input_mua = rescale(muareconMatrix, mua_min, mua_max);
-input_mus = rescale(muspreconMatrix, mus_min, mus_max);
-target_mua = rescale(muatargetMatrix, mua_min, mua_max);
-target_mus = rescale(mustargetMatrix, mus_min, mus_max);
+% normalizing input and target matrices 
+input_mua = rescale(muareconMatrix, -1, 1);
+input_mus = rescale(muspreconMatrix, -1, 1);
+
+target_mua = rescale(muatargetMatrix, 0, 1);
+target_mus = rescale(mustargetMatrix, 0, 1);
 
 % combining input and target into 2-channel format
 inputData = cat(4, input_mua, input_mus);  % [res × res × numImages × 2]
@@ -37,11 +36,11 @@ targetData = cat(4, target_mua, target_mus);
 targetData = permute(targetData, [1 2 4 3]); 
 
 % validation data
-input_mua_val = rescale(muaValReconSet, mua_min, mua_max);
-input_mus_val = rescale(musValReconSet, mus_min, mus_max);
+input_mua_val = rescale(muaValReconSet, -1, 1);
+input_mus_val = rescale(musValReconSet, -1, 1);
 
-target_mua_val = rescale(muaValiTargetSet, mua_min, mua_max);
-target_mus_val = rescale(musValTargetSet, mus_min, mus_max);
+target_mua_val = rescale(muaValTargetSet, 0, 1);
+target_mus_val = rescale(musValTargetSet, 0, 1);
 
 inputVal = cat(4, input_mua_val, input_mus_val);
 inputVal = permute(inputVal, [1 2 4 3]); 
@@ -243,14 +242,16 @@ options = trainingOptions('adam', ...
     'Shuffle', 'every-epoch', ...
     'Verbose', false, ...
     'ValidationData', valDS, ...
-    'ValidationFrequency', 250, ...
+    'ValidationFrequency', 50, ...
     'ExecutionEnvironment', 'gpu'); % is GPU is not available use 'parallel' or 'cpu' 
 
+startTime = tic;
 % training the net accoring to the options 
 [net, info] = trainNetwork(trainDS, lgraph, options);
+elapsedTime = toc(startTime); 
 
-% saving trained net 
-save('unet.mat', 'net', 'info');
+% saving trained net, info and elapsedTime 
+save('unet.mat', 'net', 'info', 'elapsedTime');
 
 % displaying a confirmation message
 disp('Done.');
