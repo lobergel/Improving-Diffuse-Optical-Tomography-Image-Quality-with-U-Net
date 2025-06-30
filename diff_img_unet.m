@@ -33,8 +33,8 @@ mus_range = 0.5; % mus in [0.5, 1.5]
 input_mua = (muareconMatrix - mua_bg) / mua_range; % scaled
 input_mus = (muspreconMatrix - mus_bg) / mus_range; % scaled
 
-% target_mua = (muatargetMatrix - mua_bg) / mua_range; % scaled
-% target_mus = (mustargetMatrix - mus_bg) / mus_range; % scaled
+target_mua = (muatargetMatrix - mua_bg) / mua_range; % scaled
+target_mus = (mustargetMatrix - mus_bg) / mus_range; % scaled
 
 % combining inputs and targets into 2-channel format
 inputData = cat(4, input_mua, input_mus);  % [res × res × numImages × 2]
