@@ -21,14 +21,22 @@ res = 32;
 % number of images in the input data set(s)
 numImages = size(muareconMatrix, 3); 
 
-% normalizing input and target matrices 
-input_mua = rescale(muareconMatrix, -1, 1);
-input_mus = rescale(muspreconMatrix, -1, 1);
+% background values
+mua_bg = 0.01;
+mus_bg = 1.0;
 
-target_mua = rescale(muatargetMatrix, 0, 1);
-target_mus = rescale(mustargetMatrix, 0, 1);
+% max absolute deviation for scaling
+mua_range = 0.01; % mua in [0.005, 0.02]
+mus_range = 0.5; % mus in [0.5, 1.5] 
 
-% combining input and target into 2-channel format
+% scaling values for network training 
+input_mua = (muareconMatrix - mua_bg) / mua_range; % scaled
+input_mus = (muspreconMatrix - mus_bg) / mus_range; % scaled
+
+% target_mua = (muatargetMatrix - mua_bg) / mua_range; % scaled
+% target_mus = (mustargetMatrix - mus_bg) / mus_range; % scaled
+
+% combining inputs and targets into 2-channel format
 inputData = cat(4, input_mua, input_mus);  % [res × res × numImages × 2]
 inputData = permute(inputData, [1 2 4 3]); % -> [res × res × 2 × numImages]
 
@@ -36,11 +44,11 @@ targetData = cat(4, target_mua, target_mus);
 targetData = permute(targetData, [1 2 4 3]); 
 
 % validation data
-input_mua_val = rescale(muaValReconSet, -1, 1);
-input_mus_val = rescale(musValReconSet, -1, 1);
+input_mua_val = (muaValReconSet - mua_bg) / mua_range; 
+input_mus_val = (musValReconSet - mus_bg) / mus_range; 
 
-target_mua_val = rescale(muaValTargetSet, 0, 1);
-target_mus_val = rescale(musValTargetSet, 0, 1);
+target_mua_val = (muaValTargetSet - mua_bg) / mua_range; % [0, 1]
+target_mus_val = (musValTargetSet - mus_bg) / mus_range; % [0, 1]
 
 inputVal = cat(4, input_mua_val, input_mus_val);
 inputVal = permute(inputVal, [1 2 4 3]); 
