@@ -22,9 +22,9 @@ res = 32; % image resolution
 % number of images in the input data set(s), all data sets should have the same amount of matrices 
 numImages = size(muareconMatrix, 3); 
 
-% max absolute deviation for scaling
-mua_range = 0.025; % mua in [0.005, 0.02] -> range = 0.02 + 0.005
-mus_range = 2; % mus in [0.5, 1.5] -> range = 0.5 + 1.5
+% ranges for scaling
+mua_range = 0.015; % mua in [0.005, 0.02] -> range = 0.02 - 0.005
+mus_range = 1; % mus in [0.5, 1.5] -> range = 1.5 - 0.5
 
 % inputs and targets for network (scaled)
 input_mua = muareconMatrix / mua_range; 
