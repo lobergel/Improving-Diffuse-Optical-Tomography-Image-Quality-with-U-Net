@@ -5,33 +5,13 @@ close all; clear;
 N = 16; % number of sources and detectors (16s16d)
 res = 32; % grid resolution
 numOfData = 100; % number of created images 
-radius = 25; % radius of 
+radius = 25; % radius of source-detector circle
 
 % temporary files
 filename_mua_recon = 'parallel_mua_recon.mat';
 filename_mus_recon = 'parallel_mus_recon.mat';
 filename_mua_target = 'parallel_mua_target.mat';
 filename_mus_target = 'parallel_mus_target.mat';
-
-% source positions 
-ths = (0 : 2*pi/N : 2 * pi)';
-sp = [radius * cos(ths) radius * sin(ths)];
-
-% detector positions 
-thd = (pi/N : 2*pi/N : 2 * pi)';
-mp = [radius * cos(thd) radius * sin(thd)];
-
-% loading mesh and setting sources, detectors to positions 
-meshname = 'mesh2D_r28.msh';
-meshpath = 'meshfiles/';
-hMesh = toastMesh([meshpath meshname]);
-hMesh.SetQM(sp, mp);
-hBasis = toastBasis(hMesh, [res res], 'Linear');
-
-% FEM setup
-qvec = hMesh.Qvec('Neumann', 'Gaussian', 2); % <- 
-mvec = hMesh.Mvec('Gaussian', 2, 1.4);       % <-
-ref = ones(hMesh.NodeCount(), 1) * 1.4;      % <- 
 
 % loading existing data
 if isfile(filename_mua_recon)
@@ -64,6 +44,26 @@ muspreconSet_new = zeros(res, res, numOfData);
 muatargetSet_new = zeros(res, res, numOfData);
 mustargetSet_new = zeros(res, res, numOfData);
 
+% source positions 
+ths = (0 : 2*pi/N : 2 * pi)';
+sp = [radius * cos(ths) radius * sin(ths)];
+
+% detector positions 
+thd = (pi/N : 2*pi/N : 2 * pi)';
+mp = [radius * cos(thd) radius * sin(thd)];
+
+% loading mesh and setting sources, detectors to positions 
+meshname = 'mesh2D_r28.msh';
+meshpath = 'meshfiles/';
+hMesh = toastMesh([meshpath meshname]);
+hMesh.SetQM(sp, mp);
+hBasis = toastBasis(hMesh, [res res], 'Linear');
+
+% FEM setup
+qvec = hMesh.Qvec('Neumann', 'Gaussian', 2); % <- 
+mvec = hMesh.Mvec('Gaussian', 2, 1.4);       % <-
+ref = ones(hMesh.NodeCount(), 1) * 1.4;      % <- 
+
 % start parallel pool
 if isempty(gcp('nocreate'))
     parpool;
@@ -93,46 +93,39 @@ parfor i = 1:numOfData
     % loading mesh data
     [vtx, elem, ~] = hMesh_local.Data;
     n = size(vtx, 1);
-
-    % inclusion 1 
-    r1 = randi([3 12]); 
-    cx1 = radius_min + (radius_max - radius_min) * rand(); 
-    cy1 = radius_min + (radius_max - radius_min) * rand();
-    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1);
-
-    % inclusion 2 
-    r2 = randi([3 12]); 
-    cx2 = radius_min + (radius_max - radius_min) * rand(); 
-    cy2 = radius_min + (radius_max - radius_min) * rand();
-    Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2);
-
     mus = mus0 * ones(n,1);
     mua = mua0 * ones(n,1);
 
-    % Index1, Index2 assigned as scattering, absorbing inclusions 
-    mus(Index1) = mus_min + (mus_max - mus_min) * rand();
-    mua(Index2) = mua_min + (mua_max - mua_min) * rand();
+    % inclusion 1 
+    r1 = randi([3 12]);                                                  % radius 
+    cx1 = radius_min + (radius_max - radius_min) * rand();               % x-position 
+    cy1 = radius_min + (radius_max - radius_min) * rand();               % y-position 
+    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1); % node indexes 
+    mus(Index1) = mus_min + (mus_max - mus_min) * rand();                % assigning a random scattering coefficient value 
+
+    % inclusion 2 
+    r2 = randi([3 12]);                                                  % radius 
+    cx2 = radius_min + (radius_max - radius_min) * rand();               % x-coordinate
+    cy2 = radius_min + (radius_max - radius_min) * rand();               % y-coordinate 
+    Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2); % node indexes 
+    mua(Index2) = mua_min + (mua_max - mua_min) * rand();                % assigning a random absorbing coefficient value 
 
     % inclusion 3, created for some iterations 
     if (randi([0 1]))
-        r3 = randi([3 12]); 
-        cx3 = radius_min + (radius_max - radius_min) * rand(); 
-        cy3 = radius_min + (radius_max - radius_min) * rand();
-        Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3);
-        
-        % inclusion 3 is assigned as absorbing 
-        mua(Index3) = mua_min + (mua_max - mua_min) * rand();
+        r3 = randi([3 12]);                                                  % radius 
+        cx3 = radius_min + (radius_max - radius_min) * rand();               % x-coordinate
+        cy3 = radius_min + (radius_max - radius_min) * rand();               % y-coordinate
+        Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3); % node indexes 
+        mua(Index3) = mua_min + (mua_max - mua_min) * rand();                % assigning a random absorbing coefficient
     end
 
     % inclusion 4, created for some iterations 
     if (randi([0 1]))
-        r4 = randi([3 12]); 
-        cx4 = radius_min + (radius_max - radius_min) * rand(); 
-        cy4 = radius_min + (radius_max - radius_min) * rand();
-        Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4);
-        
-        % inclusion 4 is assigned as scattering 
-        mus(Index4) = mus_min + (mus_max - mus_min) * rand();
+        r4 = randi([3 12]);                                                  % radius 
+        cx4 = radius_min + (radius_max - radius_min) * rand();               % x-coordinate
+        cy4 = radius_min + (radius_max - radius_min) * rand();               % y-coordinate 
+        Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4); % node indexes 
+        mus(Index4) = mus_min + (mus_max - mus_min) * rand();                % assigning a random scattering coefficient 
     end
 
     % difference from background values 
@@ -146,7 +139,7 @@ parfor i = 1:numOfData
     gamma = mvec.' * phi;
     y = [real(log(gamma(:))); imag(log(gamma(:)))];
 
-    % reference values with no inclusion 
+    % measurements with no inclusion 
     mus_ref = mus0 * ones(n,1);
     mua_ref = mua0 * ones(n,1);
     K0 = dotSysmat(hMesh_local, mua_ref, mus_ref, ref, freq);
@@ -154,7 +147,7 @@ parfor i = 1:numOfData
     gamma0 = mvec.' * phi0;
     y0 = [real(log(gamma0(:))); imag(log(gamma0(:)))];
 
-    % ... 
+    % difference between measurements with and without inclusions 
     deltay = y - y0;
 
     % adding random percentage of Gaussian noise 
@@ -166,7 +159,7 @@ parfor i = 1:numOfData
     stdn = noise * abs(y);
     Le = diag(1 ./ stdn); % L1
 
-    % ...
+    % Ornstein-Uhlenbeck prior 
     r_prior = 8;
     prior_std_mua = mua0;
     prior_std_mus = mus0;
@@ -174,7 +167,7 @@ parfor i = 1:numOfData
     Lxmus = PriorOrnsteinUhlenbeck(struct('g', vtx), prior_std_mus, r_prior);
     Lx = [Lxmua sparse(n,n); sparse(n,n) Lxmus];
 
-    % ... 
+    % solving the inverse problem 
     x = ([Le * J; Lx]) \ ([Le * deltay; zeros(2 * n, 1)]);
     muarecon = x(1:n);
     musprecon = x(n+1:end);
@@ -185,6 +178,7 @@ parfor i = 1:numOfData
     muatargetGrid = rot90(reshape(hBasis_local.Map('M->B', dmuatgt), [res, res]), 1);
     mustargetGrid = rot90(reshape(hBasis_local.Map('M->B', dmustgt), [res, res]), 1);
 
+    % appending matrices 
     muareconSet_new(:, :, i) = muareconGrid;
     muspreconSet_new(:, :, i) = muspreconGrid;
     muatargetSet_new(:, :, i) = muatargetGrid;
@@ -207,7 +201,7 @@ save(filename_mus_recon, 'muspreconSet');
 save(filename_mua_target, 'muatargetSet');
 save(filename_mus_target, 'mustargetSet');
 
-%% saving to actual files 
+%% saving to files containing training data 
 
 filename_mua_recon = '360_mua_recon.mat';
 filename_mus_recon = '360_mus_recon.mat';
