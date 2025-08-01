@@ -10,7 +10,7 @@ mustargetMatrix = mustargetSet;
 
 load("360_mua_valid_recon.mat"); load("360_mua_valid_target.mat")
 muaValReconSet = muareconSet; 
-muaValiTargetSet = muatargetSet;
+muaValTargetSet = muatargetSet;
 
 load("360_mus_valid_recon.mat"); load("360_mus_valid_target.mat")
 musValReconSet = muspreconSet;
@@ -23,8 +23,8 @@ res = 32; % image resolution
 numImages = size(muareconMatrix, 3); 
 
 % ranges for scaling
-mua_range = 0.015; % mua in [0.005, 0.02] -> range = 0.02 - 0.005
-mus_range = 1; % mus in [0.5, 1.5] -> range = 1.5 - 0.5
+mua_range = 0.015; % mua in [0.005, 0.02]  -> range = 0.02 - 0.005
+mus_range = 1;     % mus in [0.5, 1.5]     -> range = 1.5 - 0.5
 
 % inputs and targets for network (scaled)
 input_mua = muareconMatrix / mua_range; 
@@ -34,8 +34,8 @@ target_mua = muatargetMatrix / mua_range;
 target_mus = mustargetMatrix / mus_range;
 
 % combining inputs and targets into 2-channel format
-inputData = cat(4, input_mua, input_mus);  % [res × res × numImages × 2]
-inputData = permute(inputData, [1 2 4 3]); % -> [res × res × 2 × numImages]
+inputData = cat(4, input_mua, input_mus);  
+inputData = permute(inputData, [1 2 4 3]); % [res × res × numImages × 2] -> [res × res × 2 × numImages]
 % source: 
 % https://stackoverflow.com/questions/52527210/how-to-make-training-data-as-a-4-d-array-in-neural-network-matlab-proper-way-t
 
@@ -243,14 +243,14 @@ lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
 
 %% specifying the training options and training the net 
 options = trainingOptions('adam', ...
-    'MaxEpochs', 50, ...
+    'MaxEpochs', 125, ...
     'InitialLearnRate', 1e-4, ...
     'MiniBatchSize', 32, ...
     'Shuffle', 'every-epoch', ...
     'Verbose', false, ...
     'ValidationData', valDS, ...
     'ValidationFrequency', 50, ...
-    'ExecutionEnvironment', 'gpu'); % is GPU is not available use 'parallel' or 'cpu' 
+    'ExecutionEnvironment', 'gpu');
 
 startTime = tic;
 % training the net accoring to the options 
