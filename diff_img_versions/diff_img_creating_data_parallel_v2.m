@@ -80,7 +80,7 @@ mua0 = 0.01; mus0 = 1;
 noise_min = 0.005; noise_max = 0.015; 
 
 % minimum and maximum radius for inclusions 
-radius_min = -18; radius_max = 18;
+radius_min = -18; radius_max = 18; % 50
 
 startTime = tic; 
 
@@ -164,12 +164,12 @@ parfor i = 1:numOfData
     % building Jacobian 
     J = toastJacobian(hMesh_local, [], qvec, mvec, mua_ref, mus_ref, ref, freq);
     stdn = noise * abs(y);
-    Le = diag(1 ./ stdn);
+    Le = diag(1 ./ stdn); % L1
 
     % ...
     r_prior = 8;
-    prior_std_mua = mua0 / 10;
-    prior_std_mus = mus0 / 10;
+    prior_std_mua = mua0;
+    prior_std_mus = mus0;
     Lxmua = PriorOrnsteinUhlenbeck(struct('g', vtx), prior_std_mua, r_prior);
     Lxmus = PriorOrnsteinUhlenbeck(struct('g', vtx), prior_std_mus, r_prior);
     Lx = [Lxmua sparse(n,n); sparse(n,n) Lxmus];
