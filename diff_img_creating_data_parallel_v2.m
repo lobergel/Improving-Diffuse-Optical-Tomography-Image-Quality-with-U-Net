@@ -203,10 +203,10 @@ save(filename_mus_target, 'mustargetSet');
 
 %% saving to files containing training data 
 
-filename_mua_recon = '360_mua_recon.mat';
-filename_mus_recon = '360_mus_recon.mat';
-filename_mua_target = '360_mua_target.mat';
-filename_mus_target = '360_mus_target.mat';
+filename_mua_recon = 'mua_recon.mat';
+filename_mus_recon = 'mus_recon.mat';
+filename_mua_target = 'mua_target.mat';
+filename_mus_target = 'mus_target.mat';
 
 % loading existing files, initializing files in the case they don't exist 
 if isfile(filename_mua_recon)
