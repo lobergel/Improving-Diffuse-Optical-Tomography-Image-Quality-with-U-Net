@@ -1,9 +1,9 @@
 close; clear all;
 
-filename_mua_recon = '360_mua_valid_recon.mat';
-filename_mus_recon = '360_mus_valid_recon.mat';
-filename_mua_target = '360_mua_valid_target.mat';
-filename_mus_target = '360_mus_valid_target.mat';
+filename_mua_recon = 'mua_valid_recon.mat';
+filename_mus_recon = 'mus_valid_recon.mat';
+filename_mua_target = 'mua_valid_target.mat';
+filename_mus_target = 'mus_valid_target.mat';
 
 N = 16; % number of sources (and number of detectors) in range [0, 2pi]
 numOfData = 100; % number of reconstructions 
