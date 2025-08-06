@@ -1,0 +1,143 @@
+function samples = generateSamples(Geometry, nSamples, params)
+% generateSamples - generate prior samples for score-based diffusion model
+% training
+%
+%   Arguments:
+%       Geometry        - structure describing geomtery of the system
+%       nSamples        - number of samples to generate
+%       params          - see arguments block
+%
+%   Output:
+%       samples         - 4D vector [nSample, x_dim, y_dim, 2]
+%
+% konstantin.tamarov@uef.fi; meghdoot.mozumder@uef.fi
+
+arguments
+    Geometry struct;
+    nSamples double;
+    params.maxNumIncusions = 3; % max number of inclusions for mua and mus
+    params.rMin = 0.1; % mm, min radius of inclusion
+    params.rMax = 16; % mm, max radius of inclusion
+    params.muaMin = -0.01; % mm-1, min delta mua
+    params.muaMax = 0.01; % mm-1, max dela mua
+    params.musMin = -1; % mm-1, min delta mus
+    params.musMax = 1; % mm-1, max dela mus
+    params.muaBg = 0; % mm-1, backgound mua
+    params.musBg = 0; % mm-1, background mus
+    % maximum number of attempt to place inclusion so it does not overlap
+    % with already placed inclusions
+    params.maxAttemts = 1000;
+    % scale delta mua and delta mus to be in the range of [0 1]
+    params.scaleTo01 = 1;
+    % add draws from prior on top of circular inclusions
+    params.addPrior = 0;
+    params.priorMuaMean = 0; % mm-1
+    params.priorMusMean = 0; % mm-1
+    params.priorMuaStd = 0.001; % mm-1
+    params.priorMusStd = 0.1; % mm-1
+    params.priorCutoffStd = 3; % number
+    params.priorCorrLength = 10; % mm
+end
+
+nodeCount = Geometry.hMesh.NodeCount();
+[vtx, ~, ~] = Geometry.hMesh.Data();
+gridDims = Geometry.hBasis.Dims();
+rDomain = Geometry.sizes(1) / 2;
+
+samples = single(zeros(nSamples, gridDims(1), gridDims(2), 2));
+% generate prior
+if params.addPrior
+    muaL1 = priorOrnsteinUhlenbeck(Geometry, params.priorMuaStd, params.priorCorrLength, 'sample');
+    musL1 = priorOrnsteinUhlenbeck(Geometry, params.priorMusStd, params.priorCorrLength, 'sample');
+end
+
+for sampleIdx = 1:nSamples
+
+    mua = ones(nodeCount, 1) .* params.muaBg;
+    mus = ones(nodeCount, 1) .* params.musBg;
+
+    for absScaIdx = 1:2
+        % Parameters
+        numInclusions = randi([1, params.maxNumIncusions]); % Number of inclusions
+        inclusions = [];  % Store [x, y, r] for each inclusion
+
+        for i = 1:numInclusions
+            placed = false;
+            attempts = 0;
+            while ~placed && attempts < params.maxAttemts
+                r = params.rMin + rand() * (params.rMax - params.rMin);  % Random radius
+                theta = 2 * pi * rand();
+                dist = (rDomain - r) * sqrt(rand());    % Random distance from center
+                x = dist * cos(theta);
+                y = dist * sin(theta);
+
+                % Check if it overlaps with existing inclusions
+                valid = true;
+                for j = 1:size(inclusions, 1)
+                    dx = x - inclusions(j, 1);
+                    dy = y - inclusions(j, 2);
+                    d = sqrt(dx^2 + dy^2);
+                    if d < (r + inclusions(j, 3))  % overlap
+                        valid = false;
+                        break;
+                    end
+                end
+
+                if valid
+                    inclusions = [inclusions; x, y, r];
+                    placed = true;
+                end
+                attempts = attempts + 1;
+            end
+
+            cx = x; cy = y;
+            inclIdx = find(sqrt((cx - vtx(:, 1)).^2 + (cy - vtx(:, 2)).^2) < r);
+
+            % placing inclusion with random contrast
+            if absScaIdx == 1
+                mua(inclIdx) = params.muaBg + params.muaMin + (params.muaMax - params.muaMin) * rand();
+            else
+                mus(inclIdx) = params.musBg + params.musMin + (params.musMax - params.musMin) * rand();
+            end
+        end
+
+        if params.addPrior
+            muaPrior = params.priorMuaMean  + muaL1 * randn(nodeCount, 1);
+            muaPrior(muaPrior <= params.priorMuaMean - params.priorCutoffStd * params.priorMuaStd) ...
+                = params.priorMuaMean - params.priorCutoffStd * params.priorMuaStd;
+            muaPrior(muaPrior >= params.priorMuaMean + params.priorCutoffStd * params.priorMuaStd) ...
+                = params.priorMuaMean + params.priorCutoffStd * params.priorMuaStd;
+            
+            muaPrior = params.priorMusMean + musL1 * randn(nodeCount, 1);
+            muaPrior(muaPrior <= params.priorMusMean - params.priorCutoffStd * params.priorMusStd) ...
+                = params.priorMusMean - params.priorCutoffStd * params.priorMusStd;
+            muaPrior(muaPrior >= params.priorMusMean + params.priorCutoffStd * params.priorMusStd) ...
+                = params.priorMusMean + params.priorCutoffStd * params.priorMusStd;
+            mua = mua + muaPrior;
+            mus = mus + muaPrior;
+        end
+    end
+
+    mua = Geometry.hBasis.Map('M->B', mua); mua = reshape(mua, gridDims');
+    mus = Geometry.hBasis.Map('M->B', mus); mus = reshape(mus, gridDims');
+
+    % verify in grid basis the samples not exceeding limit values
+    if params.addPrior == 0
+        mua = max(mua, params.muaBg + params.muaMin);
+        mua = min(mua, params.muaBg + params.muaMax);
+        mus = max(mus, params.musBg + params.musMin);
+        mus = min(mus, params.musBg + params.musMax);
+    end
+
+    if params.scaleTo01
+        mua = (mua - params.muaMin) ./ (params.muaMax - params.muaMin);
+        mus = (mus - params.musMin) ./ (params.musMax - params.musMin);
+    end
+
+    samples(sampleIdx, :, :, 1) = single(mua);
+    samples(sampleIdx, :, :, 2) = single(mus);
+
+end
+
+end
+

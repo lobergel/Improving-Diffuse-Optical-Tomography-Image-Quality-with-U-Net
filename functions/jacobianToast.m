@@ -1,0 +1,85 @@
+function [jac, logicalFull] = jacobianToast(Geometry, xVec, params)
+% jacobianToast - compute DOT Jacobian with Toast
+%
+% Arguments:
+%   Geometry        - structure containing the geometry of the model
+%                     including toastMesh, toastBasis to map mesh to 
+%                     regular pixel grid for forward model, qVec matrix 
+%                     of sources, mVec matrix of detectors, refVec vector
+%                     of refractive intices for each node in mesh, freqsVec
+%                     vector of frequencies to be used for reconstruction
+%   xVec            - stacked [muAVec; muSVec] 
+%   params.scaling  - scaling of mua and mus parts of Jacobian
+%   params.isGridBasis - if the Jacobian is in grid basis
+%
+% Output:
+%   jac             - Jacobian
+%
+% konstantin.tamarov@uef.fi
+
+arguments
+    Geometry struct; % data structure describing geometry
+    xVec (:, 1) double; % muA and muS for mesh
+    % defines the scaling for absorption (amplitude) and scattering (phase) parts
+    params.scaling (1, 2) double = [1 1];
+    % if the Jacobian must be in grid basis
+    params.isGridBasis = 0;
+end
+
+muA = xVec(1:end/2);
+muS = xVec(end/2+1:end);
+
+cLight = 0.3 / mean(Geometry.refIndVec);
+nFreqs = length(Geometry.freqsVec);
+
+if params.isGridBasis
+    nodeCount = Geometry.hBasis.slen;
+    xVec = [Geometry.hBasis.Map('M->S', xVec(1:end/2));
+        Geometry.hBasis.Map('M->S', xVec(end/2+1:end))];
+else
+    nodeCount = Geometry.hMesh.NodeCount();
+end
+
+hBasis = 0;
+if params.isGridBasis
+    hBasis = Geometry.hBasis;
+end
+
+jacFreq = cell(nFreqs, 1);
+for freqInd = 1:nFreqs
+    jac = toastJacobian(Geometry.hMesh, hBasis, Geometry.qVec, Geometry.mVec, ...
+        muA, muS, Geometry.refIndVec, Geometry.freqsVec);
+    jac(:, 1:nodeCount) = jac(:, 1:nodeCount) * cLight;
+    jac(:, nodeCount+1:end) = jac(:, nodeCount+1:end) ...
+        * diag(-cLight ./ (3 * (xVec(1:nodeCount) + xVec(nodeCount+1:end)).^2));
+    jac(:, 1:nodeCount) = jac(:, 1:nodeCount) + jac(:, nodeCount+1:end);
+    jacFreq{freqInd} = jac;
+end
+clear jac;
+jacAmplitudes = []; jacPhases = [];
+for freqInd = 1:nFreqs
+    temp = jacFreq{freqInd};
+    jacAmplitudes = [jacAmplitudes; temp(1:end/2, :)];
+    jacPhases = [jacPhases; temp(end/2+1:end, :)];
+end
+clear jacFreq;
+jacFull = [jacAmplitudes; jacPhases];
+
+if params.isGridBasis
+    % we need to zero Jacobian for pixels outside of the domain
+    temp = Geometry.hBasis.Map('M->B', ones(prod(Geometry.hMesh.NodeCount()), 1));
+    temp = reshape(temp, Geometry.dims(:)'); temp(temp > 0) = 1;
+    logicalFull = int8(temp);
+    indexFull = find(temp == 1);
+    jac = zeros(2 * sum(Geometry.measConfig(:)), prod(Geometry.dims), 2);
+    jac(:, indexFull, 1) = jacFull(:, 1:end/2) .* params.scaling(1);
+    jac(:, indexFull, 2) = jacFull(:, end/2+1:end) .* params.scaling(2);
+else
+    jac = zeros(2 * Geometry.nSources * Geometry.nSources, nodeCount, 2);
+    jac(:, :, 1) = jacFull(:, 1:end/2) .* params.scaling(1);
+    jac(:, :, 2) = jacFull(:, end/2+1, end) .* params.scaling(2);
+end
+
+
+end
+
