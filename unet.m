@@ -1,18 +1,18 @@
 clear; close all;
 
-load("360_mua_recon.mat"); load("360_mua_target.mat")
+load("mua_recon.mat"); load("mua_target.mat")
 muareconMatrix = muareconSet;
 muatargetMatrix = muatargetSet;
 
-load("360_mus_recon.mat"); load("360_mus_target.mat")
+load("mus_recon.mat"); load("mus_target.mat")
 muspreconMatrix = muspreconSet;
 mustargetMatrix = mustargetSet;
 
-load("360_mua_valid_recon.mat"); load("360_mua_valid_target.mat")
+load("mua_valid_recon.mat"); load("mua_valid_target.mat")
 muaValReconSet = muareconSet; 
 muaValTargetSet = muatargetSet;
 
-load("360_mus_valid_recon.mat"); load("360_mus_valid_target.mat")
+load("mus_valid_recon.mat"); load("mus_valid_target.mat")
 musValReconSet = muspreconSet;
 musValTargetSet = mustargetSet;
 
@@ -262,3 +262,4 @@ save('unet.mat', 'net', 'info', 'elapsedTime');
 
 % displaying a confirmation message
 disp('Done.');
+
