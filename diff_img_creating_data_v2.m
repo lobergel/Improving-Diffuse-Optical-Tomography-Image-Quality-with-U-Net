@@ -2,17 +2,20 @@ clear; close all;
 
 startTime = tic();
 
-res = 32;
-numOfData = 1000;
-rng('shuffle');
+res = 32;             % resolution of images (reconstructions, targets)
+num_of_data = 5000;   % number of images created in the for-loop
+rng('shuffle');       % the for-loop creates random variation of inclusions
+                      % with rng('shuffle'), for-loop doesn't create the same inclusions, as the loop is run again
 
 addpath('./functions/');
 dataDir = './data/';
 meshDir = './meshfiles/';
 
-load([dataDir 'measConfig.mat']);
+load([dataDir 'measConfig.mat']); % source-detector configurations 
 load([dataDir 'stdError.mat']);
 
+% createGeometry generates mesh, source-detector configurations, grid with wanted dimensions, etc. 
+% createGeometry is used to have the reconstructions and eventual measurement-reconstructions be as similar as possible
 Geometry = createGeometry(meshName = "mesh2D_r28.msh", meshDir = meshDir, isGmsh = 0, ...
     measConfig = measConfig, dataDir = dataDir, gridDimensions = [res res]);
 
@@ -23,78 +26,74 @@ mvec = Geometry.mVec;
 ref = Geometry.refIndVec;
 DataLinkList = hMesh.DataLinkList();
 
-[vtx, elem, ~] = hMesh.Data(); % 80mm x 80mm 
-n = size(vtx, 1);
+[vtx, elem, ~] = hMesh.Data(); % mesh has area of 80mm x 80mm 
+n = size(vtx, 1);              % number of nodes 
 
-muareconSet_new = zeros(res, res, numOfData);
-muspreconSet_new = zeros(res, res, numOfData);
-muatargetSet_new = zeros(res, res, numOfData);
-mustargetSet_new = zeros(res, res, numOfData);
+muareconSet_new = zeros(res, res, num_of_data);  % reconstructed µa
+muspreconSet_new = zeros(res, res, num_of_data); % reconstructed µs'
+muatargetSet_new = zeros(res, res, num_of_data); % target µa 
+mustargetSet_new = zeros(res, res, num_of_data); % target µs'
 
-mua0 = 0.01; mus0 = 1;
+mua0 = 0.01; mus0 = 1;                     % background values for µa, µs' (mm^-1)
 
-min_mua = 0.005; max_mua = 0.02;
-min_mus = 0.5; max_mus = 1.5;
+min_mua = 0.005; max_mua = 0.02;           % minimum and maximum µa coefficients 
+min_mus = 0.5; max_mus = 2;                % minimum and maximum µs' coefficients 
 
-min_noise = 0.005; max_noise = 0.03; 
+min_noise = 0.005; max_noise = 0.03;       % minimum and maximum percentage for noise 
 
-min_incl_radius = 3; max_incl_radius = 12; 
+min_incl_radius = 3; max_incl_radius = 12; % minimum and maximum radius for the inclusions (in mm) 
 
-min_x = -35; max_x = 35;
-min_y = -35; max_y = 35;
+min_x = -35; max_x = 35;                   % minimum and maximum x-coordinate for the inclusions (in mm)
+min_y = -35; max_y = 35;                   % minimum and maximum y-coordinate for the inclusions (in mm)
 
-fprintf('Progress: %3d%% (%3d / %3d)', 0, 0, numOfData);
-backspace_count = length(sprintf('%3d%% (%3d / %3d)', 0, 0, numOfData));
+fprintf('Progress: %5.1f%% (%5d / %5d)', 0, 0, num_of_data);
+backspace_count = length(sprintf('%5.1f%% (%5d / %5d)', 0, 0, num_of_data));
 
-for i = 1:numOfData
-    dmuatgt = 0;
-    dmustgt = 0;
+for i = 1:num_of_data
 
-    % while-loop is repeated until difference between background and target are not zero 
-    while all(dmuatgt == 0) || all(dmustgt == 0)
-    r1 = randi([min_incl_radius max_incl_radius]);
-    cx1 = min_x + (max_x - min_x) * rand();
-    cy1 = min_y + (max_y - min_y) * rand();
-    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1);
-    
-    r2 = randi([min_incl_radius max_incl_radius]);
-    cx2 = min_x + (max_x - min_x) * rand();
-    cy2 = min_y + (max_y - min_y) * rand();
-    Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2);
+    % inclusion 1
+    r1 = randi([min_incl_radius max_incl_radius]);                           % radius
+    cx1 = min_x + (max_x - min_x) * rand();                                  % x-coordinate
+    cy1 = min_y + (max_y - min_y) * rand();                                  % y-coodinate
+    Index1 = find(sqrt((cx1 - vtx(:,1)).^2 + (cy1 - vtx(:,2)).^2) < r1);     % indeces corresponding to the position
 
-    mus = mus0 * ones(n,1);
-    mua = mua0 * ones(n,1);
+    % inclusion 2
+    r2 = randi([min_incl_radius max_incl_radius]);                           % radius 
+    cx2 = min_x + (max_x - min_x) * rand();                                  % x-coordinate
+    cy2 = min_y + (max_y - min_y) * rand();                                  % y-coordinate
+    Index2 = find(sqrt((cx2 - vtx(:,1)).^2 + (cy2 - vtx(:,2)).^2) < r2);     % indeces corresponding to the position
 
-    mus(Index1) = min_mus + (max_mus - min_mus) * rand();
-    mua(Index2) = min_mua + (max_mua - min_mua) * rand();
+    mus = mus0 * ones(n,1);                                                  % initializing µs' values
+    mua = mua0 * ones(n,1);                                                  % initializing µa values
 
-    if (randi([0 1]))
-        r3 = randi([min_incl_radius max_incl_radius]);
-        cx3 = min_x + (max_x - min_x) * rand();
-        cy3 = min_x + (max_x - min_x) * rand();
-        Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3);
-        mua(Index3) = min_mua + (max_mua - min_mua) * rand();
+    mus(Index1) = min_mus + (max_mus - min_mus) * rand();                    % adding inclusion 1 with random coefficient
+    mua(Index2) = min_mua + (max_mua - min_mua) * rand();                    % adding inclusion 2 with random coefficient
+
+    % inclusion 3 
+    if (randi([0 1]))                                                        % inclusion 3 is created only for some images 
+        r3 = randi([min_incl_radius max_incl_radius]);                       % radius 
+        cx3 = min_x + (max_x - min_x) * rand();                              % x-coordinate
+        cy3 = min_y + (max_y - min_y) * rand();                              % y-coordinate
+        Index3 = find(sqrt((cx3 - vtx(:,1)).^2 + (cy3 - vtx(:,2)).^2) < r3); % indeces corresponding to the position
+        mua(Index3) = min_mua + (max_mua - min_mua) * rand();                % adding inclusion 3 with random coefficient
     end
 
-    if (randi([0 1]))
-        r4 = randi([min_incl_radius max_incl_radius]);
-        cx4 = min_x + (max_x - min_x) * rand();
-        cy4 = min_x + (max_x - min_x) * rand();
-        Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4);
-        mus(Index4) = min_mus + (max_mus - min_mus) * rand();
+    % inclusion 4
+    if (randi([0 1]))                                                        % inclusion 4 is created only for some images 
+        r4 = randi([min_incl_radius max_incl_radius]);                       % radius 
+        cx4 = min_x + (max_x - min_x) * rand();                              % x-coordinate
+        cy4 = min_y + (max_y - min_y) * rand();                              % y-coordinate
+        Index4 = find(sqrt((cx4 - vtx(:,1)).^2 + (cy4 - vtx(:,2)).^2) < r4); % indeces corresponding to position 
+        mus(Index4) = min_mus + (max_mus - min_mus) * rand();                % adding inclusion 4 with random coefficient 
     end
 
-    dmuatgt = mua - mua0;
-    dmustgt = mus - mus0;
-    end 
-    freq = 100;
+    dmuatgt = mua - mua0;                                                    % µa inclusions map (difference from background)
+    dmustgt = mus - mus0;                                                    % µs' inclusion map (difference from background) 
 
-    % K = dotSysmat(hMesh, mua, mus, ref, freq);
-    % phi = K \ qvec;
-    % gamma = mvec.' * phi;
-    % y = [real(log(gamma(:))); imag(log(gamma(:)))];
+    freq = 100;                                                              % measurement frequency
 
-    K = dotSysmat(hMesh, mua, mus, ref, freq);
+    % forward solve, with inclusions 
+    K = dotSysmat(hMesh, mua, mus, ref, freq); 
     phi = K \ qvec;
     gamma = mvec.' * phi;
     gamma = gamma(DataLinkList());
@@ -103,14 +102,8 @@ for i = 1:numOfData
     imag_part = unwrap(imag(log_gamma));
     
     y = [real_part; imag_part];
-    
-    % mus_ref = mus0 * ones(n,1);
-    % mua_ref = mua0 * ones(n,1);
-    % K0 = dotSysmat(hMesh, mua_ref, mus_ref, ref, freq);
-    % phi0 = K0 \ qvec;
-    % gamma0 = mvec.' * phi0;
-    % y0 = [real(log(gamma0(:))); imag(log(gamma0(:)))];
 
+    % forward solve, no inclusions (reference)
     mus_ref = mus0 * ones(n, 1);
     mua_ref = mua0 * ones(n, 1);
     K0 = dotSysmat(hMesh, mua_ref, mus_ref, ref, freq);
@@ -122,39 +115,44 @@ for i = 1:numOfData
     imag_part0 = unwrap(imag(log_gamma0));
     
     y0 = [real_part0; imag_part0];
-   
-    deltay = y - y0;
 
-    noise = min_noise + (max_noise - min_noise) * rand();
-    deltay = deltay + noise * randn(length(deltay), 1) .* abs(deltay);
+    deltay = y - y0;                                                       % difference between reconstructions 
 
-    J = toastJacobian(hMesh, [], qvec, mvec, mua_ref, mus_ref, ref, freq);
-    % stdn = noise * abs(y);
-    stdn = stdError;
+    noise = min_noise + (max_noise - min_noise) * rand();                  % percentage of noise 
+    deltay = deltay + noise * randn(length(deltay), 1) .* abs(deltay);     % adding Gaussian noise to the difference data 
+
+    % solving the inverse problem 
+    J = toastJacobian(hMesh, [], qvec, mvec, mua_ref, mus_ref, ref, freq); % Jacobian 
+    stdn = stdError;                                                       % standard error from measurement data 
     Le = diag(1 ./ stdn);
 
+    % spatial prior, OU prior 
     r_prior = 8;
-    prior_std_mua = mua0;
-    prior_std_mus = mus0;
+    prior_std_mua = mua0;                                                    
+    prior_std_mus = mus0;                                                    
     Lxmua = PriorOrnsteinUhlenbeck(struct('g', vtx), prior_std_mua, r_prior);
     Lxmus = PriorOrnsteinUhlenbeck(struct('g', vtx), prior_std_mus, r_prior);
     Lx = [Lxmua sparse(n,n); sparse(n,n) Lxmus];
 
+    % solving the system 
     x = ([Le * J; Lx]) \ ([Le * deltay; zeros(2 * n, 1)]);
     muarecon = x(1:n);
     musprecon = x(n+1:end);
 
-    muareconGrid = rot90(reshape(hBasis.Map('M->B', muarecon), [res, res]), 1);
-    muspreconGrid = rot90(reshape(hBasis.Map('M->B', musprecon), [res, res]), 1);
-    muatargetGrid = rot90(reshape(hBasis.Map('M->B', dmuatgt), [res, res]), 1);
-    mustargetGrid = rot90(reshape(hBasis.Map('M->B', dmustgt), [res, res]), 1);
+    % mapping from mesh to grid 
+    muareconGrid = rot90(reshape(hBasis.Map('M->B', muarecon), [res, res]), 1);    % contains µa reconstruction
+    muspreconGrid = rot90(reshape(hBasis.Map('M->B', musprecon), [res, res]), 1);  % contains µs' reconstruction
+    muatargetGrid = rot90(reshape(hBasis.Map('M->B', dmuatgt), [res, res]), 1);    % contains µa target
+    mustargetGrid = rot90(reshape(hBasis.Map('M->B', dmustgt), [res, res]), 1);    % contains µs' target 
 
-    muareconSet_new(:, :, i) = muareconGrid;
-    muspreconSet_new(:, :, i) = muspreconGrid;
-    muatargetSet_new(:, :, i) = muatargetGrid;
-    mustargetSet_new(:, :, i) = mustargetGrid;
+    muareconSet_new(:, :, i) = muareconGrid;                                       % adds µa reconstruction to a temporary matrix 
+    muspreconSet_new(:, :, i) = muspreconGrid;                                     % adds µs' reconstruction to a temporary matrix
+    muatargetSet_new(:, :, i) = muatargetGrid;                                     % adds µa target to a temporary matrix
+    mustargetSet_new(:, :, i) = mustargetGrid;                                     % adds µs' target to a temporary matrix
 
-    progress_str = sprintf(' %3d%% (%3d / %3d)', round(100*i/numOfData), i, numOfData);
+    % progress counter 
+    percent = 100 * i/num_of_data;
+    progress_str = sprintf(' %5.1f%% (%5d / %5d)', percent, i, num_of_data);
     fprintf(['\b' repmat('\b', 1, backspace_count) '%s'], progress_str);
 end
     
@@ -189,7 +187,7 @@ else
     mustargetSet = [];
 end
 
-
+% appending newly created matrices to any existing dataset in file
 muareconSet = cat(3, muareconSet, muareconSet_new);
 muspreconSet = cat(3, muspreconSet, muspreconSet_new);
 muatargetSet = cat(3, muatargetSet, muatargetSet_new);
@@ -200,6 +198,7 @@ save(filename_recon_mus, 'muspreconSet');
 save(filename_target_mua, 'muatargetSet');
 save(filename_target_mus, 'mustargetSet');
 
+% summary 
 fprintf('\nSaved data:\n');
 fprintf('  %s: %d reconstructions\n', filename_recon_mua,  size(muareconSet, 3));
 fprintf('  %s: %d reconstructions\n', filename_recon_mus,  size(muspreconSet, 3));
