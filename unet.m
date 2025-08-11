@@ -1,71 +1,63 @@
 clear; close all;
 
-load("mua_recon.mat"); load("mua_target.mat")
-muareconMatrix = muareconSet;
+%% Loading training data and validation data 
+load("mua_recon.mat"); load("mua_target.mat")                % files contain µa reconstructions and targets used for training 
+muareconMatrix = muareconSet;                    
 muatargetMatrix = muatargetSet;
 
-load("mus_recon.mat"); load("mus_target.mat")
+load("mus_recon.mat"); load("mus_target.mat")                % files contain µs' reconstructions and targets used for training 
 muspreconMatrix = muspreconSet;
 mustargetMatrix = mustargetSet;
 
-load("mua_valid_recon.mat"); load("mua_valid_target.mat")
+load("mua_valid_recon.mat"); load("mua_valid_target.mat")    % files contain µa reconstructions and targets used for validation
 muaValReconSet = muareconSet; 
 muaValTargetSet = muatargetSet;
 
-load("mus_valid_recon.mat"); load("mus_valid_target.mat")
+load("mus_valid_recon.mat"); load("mus_valid_target.mat")    % files contain µs' reconstructions and targets used for validation 
 musValReconSet = muspreconSet;
 musValTargetSet = mustargetSet;
 
-res = 32; % image resolution 
+%% Assigning constants and scalining data 
+res = 32;                                                    % resolution of training data, validation data
+numImages = size(muareconMatrix, 3);                         % all 
 
-%% 
-% number of images in the input data set(s), all data sets should have the same amount of matrices 
-numImages = size(muareconMatrix, 3); 
+mua_range = 0.015;                                           % µa is in [0.005, 0.02]  -> range = 0.02 - 0.005 = 0.015
+mus_range = 1;                                               % µs' is in [0.5, 1.5]    -> range = 1.5 - 0.5 = 1.0 
 
-% ranges for scaling
-mua_range = 0.015; % mua in [0.005, 0.02]  -> range = 0.02 - 0.005
-mus_range = 1;     % mus in [0.5, 1.5]     -> range = 1.5 - 0.5
-
-% inputs and targets for network (scaled)
-input_mua = muareconMatrix / mua_range; 
-input_mus = muspreconMatrix / mus_range;
-
+input_mua = muareconMatrix / mua_range;                      % Inputs and targets need to be scaled to a range, where µa and µs' values are on the same range,
+input_mus = muspreconMatrix / mus_range;                     % before training the network. After using the trained net to make a prediction, the outputs need to
+                                                             % be scaled back. 
 target_mua = muatargetMatrix / mua_range;
 target_mus = mustargetMatrix / mus_range;
 
-% combining inputs and targets into 2-channel format
-inputData = cat(4, input_mua, input_mus);  
-inputData = permute(inputData, [1 2 4 3]); % [res × res × numImages × 2] -> [res × res × 2 × numImages]
-% source: 
-% https://stackoverflow.com/questions/52527210/how-to-make-training-data-as-a-4-d-array-in-neural-network-matlab-proper-way-t
+input_data = cat(4, input_mua, input_mus);                   % combining the inputs to a 2-channel format 
+input_data = permute(input_data, [1 2 4 3]);                 % permuting [res × res × numImages × 2] -> [res × res × 2 × numImages]
+                                                             % https://stackoverflow.com/questions/52527210/how-to-make-training-data-as-a-4-d-array-in-neural-network-matlab-proper-way-t
+                                                             
+target_data = cat(4, target_mua, target_mus);                % combining targets to a 2-channel format 
+target_data = permute(target_data, [1 2 4 3]);               % permuting [res × res × numImages × 2] -> [res × res × 2 × numImages]
 
-targetData = cat(4, target_mua, target_mus);  
-targetData = permute(targetData, [1 2 4 3]); 
+input_mua_val = mua_val_recon_set / mua_range;               % scaling µa validation-reconstruction data 
+input_mus_val = mus_val_recon_set / mus_range;               % scaling µs' validation-reconstruction data
 
-% validation data (scaled)
-input_mua_val = muaValReconSet / mua_range; 
-input_mus_val = musValReconSet / mus_range; 
+target_mua_val = mua_val_target_set / mua_range;             % scaling µa validation-target data
+target_mus_val = mus_val_target_set / mus_range;             % scaling µs' validation-target data 
 
-target_mua_val = muaValTargetSet / mua_range; 
-target_mus_val = musValTargetSet / mus_range; 
+input_val = cat(4, input_mua_val, input_mus_val);            % combining the inputs for µa, µs' into a 2-channel format
+input_val = permute(input_val, [1 2 4 3]);                   % permuting 
 
-inputVal = cat(4, input_mua_val, input_mus_val);
-inputVal = permute(inputVal, [1 2 4 3]); 
+target_val = cat(4, target_mua_val, target_mus_val);         % combining the targets for µa, µs' into a 2-channel format 
+target_val = permute(target_val, [1 2 4 3]);                 % permuting 
 
-targetVal = cat(4, target_mua_val, target_mus_val);
-targetVal = permute(targetVal, [1 2 4 3]);
+%% creating datastores 
 
-%% combining datastores 
+input_DS = arrayDatastore(input_data, 'IterationDimension', 4);   % datastore for input data, 'IterationDimension' is 4 referring to how input_data was permuted 
+target_DS = arrayDatastore(target_data, 'IterationDimension', 4); % datastore for target data 
+train_DS = combine(input_DS, target_DS);                          % combining the datastores, creating the set of training data
 
-% input data and targets 
-inputDS = arrayDatastore(inputData, 'IterationDimension', 4);
-targetDS = arrayDatastore(targetData, 'IterationDimension', 4);
-dsTrain = combine(inputDS, targetDS);
-
-% validation data and targets 
-inputValDS = arrayDatastore(inputVal, 'IterationDimension', 4);
-targetValDS = arrayDatastore(targetVal, 'IterationDimension', 4);
-valDS = combine(inputValDS, targetValDS);
+input_val_DS = arrayDatastore(input_val, 'IterationDimension', 4);   % datastore for input data, used for validation
+target_val_DS = arrayDatastore(target_val, 'IterationDimension', 4); % datastore for target data, used for validation
+val_DS = combine(input_val_DS, target_val_DS);                       % combining datastores, creating datastore used for validation 
 
 %% building the network 
 
@@ -248,13 +240,13 @@ options = trainingOptions('adam', ...
     'MiniBatchSize', 32, ...
     'Shuffle', 'every-epoch', ...
     'Verbose', false, ...
-    'ValidationData', valDS, ...
+    'ValidationData', val_DS, ...
     'ValidationFrequency', 50, ...
     'ExecutionEnvironment', 'gpu');
 
 startTime = tic;
 % training the net accoring to the options 
-[net, info] = trainNetwork(trainDS, lgraph, options);
+[net, info] = trainNetwork(train_DS, lgraph, options);
 elapsedTime = toc(startTime); 
 
 % saving trained net, info and elapsedTime 
@@ -262,4 +254,3 @@ save('unet.mat', 'net', 'info', 'elapsedTime');
 
 % displaying a confirmation message
 disp('Done.');
-
