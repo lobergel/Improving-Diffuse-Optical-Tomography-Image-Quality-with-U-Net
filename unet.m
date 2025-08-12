@@ -1,6 +1,13 @@
+% ...
+% Sources: 
+% https://github.com/prafful-kumar/Blurred-Image-Recognition/blob/main/Deblurring_U_NET(Keras).ipynb
+% https://se.mathworks.com/help/deeplearning/builtin-layers.html
+% https://se.mathworks.com/help/deeplearning/ref/nnet.cnn.layer.dropoutlayer.html
+
 clear; close all;
 
-%% Loading training data and validation data 
+%% Loading training data and validation data created using diff_img_creating_data_v2.m (or older versions) 
+
 load("mua_recon.mat"); load("mua_target.mat")                % files contain µa reconstructions and targets used for training 
 muareconMatrix = muareconSet;                    
 muatargetMatrix = muatargetSet;
@@ -18,13 +25,15 @@ musValReconSet = muspreconSet;
 musValTargetSet = mustargetSet;
 
 %% Assigning constants and scalining data 
+
+percent = 0.25;                                              % percent of disabled neurons in the network (dropout)
 res = 32;                                                    % resolution of training data, validation data
-numImages = size(muareconMatrix, 3);                         % all 
-
+% numImages = size(muareconMatrix, 3);                       % number of dataset/images in files
+                                                             % In file diff_img_creating_data_v2.m µa, µs' are constrained to a range of min, max values. This gives the ranges for both. 
 mua_range = 0.015;                                           % µa is in [0.005, 0.02]  -> range = 0.02 - 0.005 = 0.015
-mus_range = 1;                                               % µs' is in [0.5, 1.5]    -> range = 1.5 - 0.5 = 1.0 
+mus_range = 1.5;                                               % µs' is in [0.5, 2]    -> range = 2 - 0.5 = 1.5
 
-input_mua = muareconMatrix / mua_range;                      % Inputs and targets need to be scaled to a range, where µa and µs' values are on the same range,
+input_mua = muareconMatrix / mua_range;                      % Inputs and targets need to be scaled so that µa and µs' values are on the same range,
 input_mus = muspreconMatrix / mus_range;                     % before training the network. After using the trained net to make a prediction, the outputs need to
                                                              % be scaled back. 
 target_mua = muatargetMatrix / mua_range;
@@ -32,7 +41,6 @@ target_mus = mustargetMatrix / mus_range;
 
 input_data = cat(4, input_mua, input_mus);                   % combining the inputs to a 2-channel format 
 input_data = permute(input_data, [1 2 4 3]);                 % permuting [res × res × numImages × 2] -> [res × res × 2 × numImages]
-                                                             % https://stackoverflow.com/questions/52527210/how-to-make-training-data-as-a-4-d-array-in-neural-network-matlab-proper-way-t
                                                              
 target_data = cat(4, target_mua, target_mus);                % combining targets to a 2-channel format 
 target_data = permute(target_data, [1 2 4 3]);               % permuting [res × res × numImages × 2] -> [res × res × 2 × numImages]
@@ -59,15 +67,12 @@ input_val_DS = arrayDatastore(input_val, 'IterationDimension', 4);   % datastore
 target_val_DS = arrayDatastore(target_val, 'IterationDimension', 4); % datastore for target data, used for validation
 val_DS = combine(input_val_DS, target_val_DS);                       % combining datastores, creating datastore used for validation 
 
-%% building the network 
+%% Building the network 
 
-% built-in layers -> https://se.mathworks.com/help/deeplearning/builtin-layers.html
-% network structure similar to this -> https://github.com/prafful-kumar/Blurred-Image-Recognition/blob/main/Deblurring_U_NET(Keras).ipynb
-
-% input layer
+% Input layer
 inputLayer = imageInputLayer([res res 2], 'Name', 'input');
 
-% encoder
+% Encoder
 enc1 = [
     convolution2dLayer(3, res * 2, 'Padding', 'same', 'Name', 'enc1_conv1') % starts with 64 filters instead of 32 
     batchNormalizationLayer('Name', 'enc1_bn1')
@@ -116,7 +121,7 @@ enc4 = [
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'enc4_pool')
 ];
 
-% bottleneck
+% Bottleneck
 bottleneck = [
     convolution2dLayer(3, res * 32, 'Padding', 'same', 'Name', 'bottleneck_conv1')
     batchNormalizationLayer('Name', 'bottleneck_bn1')
@@ -126,17 +131,13 @@ bottleneck = [
     batchNormalizationLayer('Name', 'bottleneck_bn2')
     reluLayer('Name', 'bottleneck_relu2')
 
-    dropoutLayer(0.25, 'Name', 'bottleneck_dropout')  
-    % disables 25% of neurons randomly to prevent overfitting -> net doesn't depend on specific neurons 
-    % sources: 
-    % https://www.mdpi.com/2079-9292/11/3/305#:~:text=Following%20this%20process%2C%20the%20feature%20maps%20enter%20a%20batch%20normalization%20and%20ReLU%20activation%20layer.%20After%20which%2C%20they%20pass%20through%20a%20dropout%20layer%20(25%25%20dropout).
-    % https://se.mathworks.com/help/deeplearning/ref/nnet.cnn.layer.dropoutlayer.html
-    
+    dropoutLayer(percent, 'Name', 'bottleneck_dropout') 
+
     transposedConv2dLayer(2, res * 32, 'Stride', 2, 'Name', 'bottleneck_up')
     reluLayer('Name', 'bottleneck_relu3')
 ];
 
-% decoder
+% Decoder
 dec4 = [
     depthConcatenationLayer(2, 'Name', 'dec4_concat')
     convolution2dLayer(3, res * 16, 'Padding', 'same', 'Name', 'dec4_conv1')
@@ -190,14 +191,14 @@ dec1 = [
     reluLayer('Name', 'dec1_relu2')
 ];
 
-% output
+% Output
 outputLayer = [
     convolution2dLayer(1, 2, 'Name', 'final_conv')  
     regressionLayer('Name', 'output') % loss function MSE 
 ];
 
 
-% assembling
+% Assembling the layer graph
 lgraph = layerGraph();
 lgraph = addLayers(lgraph, inputLayer);
 lgraph = addLayers(lgraph, enc1);
@@ -211,14 +212,14 @@ lgraph = addLayers(lgraph, dec2);
 lgraph = addLayers(lgraph, dec1);
 lgraph = addLayers(lgraph, outputLayer);
 
-% encoder connections
+% Encoder connections
 lgraph = connectLayers(lgraph, 'input', 'enc1_conv1');
 lgraph = connectLayers(lgraph, 'enc1_pool', 'enc2_conv1');
 lgraph = connectLayers(lgraph, 'enc2_pool', 'enc3_conv1');
 lgraph = connectLayers(lgraph, 'enc3_pool', 'enc4_conv1');
 lgraph = connectLayers(lgraph, 'enc4_pool', 'bottleneck_conv1');
 
-% decoder connections with skip connections
+% Decoder connections with skip connections
 lgraph = connectLayers(lgraph, 'bottleneck_relu3', 'dec4_concat/in1');
 lgraph = connectLayers(lgraph, 'enc4_relu2', 'dec4_concat/in2');
 lgraph = connectLayers(lgraph, 'dec4_relu3', 'dec3_concat/in1');
@@ -228,12 +229,13 @@ lgraph = connectLayers(lgraph, 'enc2_relu2', 'dec2_concat/in2');
 lgraph = connectLayers(lgraph, 'dec2_relu3', 'dec1_concat/in1');
 lgraph = connectLayers(lgraph, 'enc1_relu2', 'dec1_concat/in2');
 
-% output connection
+% Output connection
 lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
 
 % analyzeNetwork(lgraph) % shows networks structure 
 
-%% specifying the training options and training the net 
+%% Specifying the training options and training the net 
+
 options = trainingOptions('adam', ...
     'MaxEpochs', 125, ...
     'InitialLearnRate', 1e-4, ...
@@ -245,12 +247,12 @@ options = trainingOptions('adam', ...
     'ExecutionEnvironment', 'gpu');
 
 startTime = tic;
-% training the net accoring to the options 
 [net, info] = trainNetwork(train_DS, lgraph, options);
 elapsedTime = toc(startTime); 
 
-% saving trained net, info and elapsedTime 
+% Saving trained net, info and elapsedTime 
 save('unet.mat', 'net', 'info', 'elapsedTime');
 
-% displaying a confirmation message
+% Displaying a confirmation message
 disp('Done.');
+
