@@ -9,19 +9,34 @@
 %   must be within physically meaningful ranges based on the mesh size
 
 % Note:
-% - The mesh dimensions are fixed at 80mm × 80mm
-% - Filenames and paths used after the for-loop can be modified 
-
+% - The mesh dimensions are fixed at 80mm × 80mm for this version 
+% - When creating validation data, change filenames ('mua_valid_recon.mat', etc.)
 
 clear; close all;
 
+res = 32;                                  % resolution of images (reconstructions, targets)
+num_of_data = 5000;                        % number of images created in the for-loop
+
+mua0 = 0.01; mus0 = 1;                     % background values for µa, µs' (mm^-1)
+
+min_mua = 0.005; max_mua = 0.02;           % minimum and maximum µa coefficients 
+min_mus = 0.5; max_mus = 2;                % minimum and maximum µs' coefficients 
+
+min_noise = 0.005; max_noise = 0.03;       % minimum and maximum percentage for noise 
+
+min_incl_radius = 3; max_incl_radius = 12; % minimum and maximum radius for the inclusions (in mm) 
+
+min_x = -35; max_x = 35;                   % minimum and maximum x-coordinate for the inclusions (in mm)
+min_y = -35; max_y = 35;                   % minimum and maximum y-coordinate for the inclusions (in mm)
+
+filename_recon_mua = 'mua_recon.mat';      % filename for µa reconstructions 
+filename_recon_mus = 'mus_recon.mat';      % filename for µs' reconstructions 
+filename_target_mua = 'mua_target.mat';    % filename for µa targets 
+filename_target_mus = 'mus_target.mat';    % filename for µs' targets 
+
+rng('shuffle');                            % Used for-loop creates random variation of inclusions. With rng('shuffle'), 
+                                           % for-loop doesn't create the same inclusions, as the loop is run again.
 startTime = tic();
-
-res = 32;             % resolution of images (reconstructions, targets)
-num_of_data = 5000;   % number of images created in the for-loop
-
-rng('shuffle');       % Used for-loop creates random variation of inclusions. With rng('shuffle'), 
-                      % for-loop doesn't create the same inclusions, as the loop is run again.
 
 addpath('./functions/');
 dataDir = './data/';
@@ -49,18 +64,6 @@ muareconSet_new = zeros(res, res, num_of_data);  % reconstructed µa
 muspreconSet_new = zeros(res, res, num_of_data); % reconstructed µs'
 muatargetSet_new = zeros(res, res, num_of_data); % target µa 
 mustargetSet_new = zeros(res, res, num_of_data); % target µs'
-
-mua0 = 0.01; mus0 = 1;                     % background values for µa, µs' (mm^-1)
-
-min_mua = 0.005; max_mua = 0.02;           % minimum and maximum µa coefficients 
-min_mus = 0.5; max_mus = 2;                % minimum and maximum µs' coefficients 
-
-min_noise = 0.005; max_noise = 0.03;       % minimum and maximum percentage for noise 
-
-min_incl_radius = 3; max_incl_radius = 12; % minimum and maximum radius for the inclusions (in mm) 
-
-min_x = -35; max_x = 35;                   % minimum and maximum x-coordinate for the inclusions (in mm)
-min_y = -35; max_y = 35;                   % minimum and maximum y-coordinate for the inclusions (in mm)
 
 fprintf('Progress: %5.1f%% (%5d / %5d)', 0, 0, num_of_data);
 backspace_count = length(sprintf('%5.1f%% (%5d / %5d)', 0, 0, num_of_data));
@@ -173,11 +176,6 @@ for i = 1:num_of_data
 end
     
 %% Saving data to files 
-
-filename_recon_mua = 'mua_recon.mat';    % filename for µa reconstructions 
-filename_recon_mus = 'mus_recon.mat';    % filename for µs' reconstructions 
-filename_target_mua = 'mua_target.mat';  % filename for µa targets 
-filename_target_mus = 'mus_target.mat';  % filename for µs' targets 
 
 % After the for-loop, the existence of files is checked. If the files do not exist, they are created.
 if isfile(filename_recon_mua)
