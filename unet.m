@@ -1,4 +1,7 @@
-% ...
+% In this script, U-Net neural network is trained using training data and validation data created in diff_img_creating_data_v3.m
+% Variable "percentage" can be changed.
+% Training options can also be altered. 
+
 % Sources: 
 % https://github.com/prafful-kumar/Blurred-Image-Recognition/blob/main/Deblurring_U_NET(Keras).ipynb
 % https://se.mathworks.com/help/deeplearning/builtin-layers.html
@@ -74,11 +77,11 @@ inputLayer = imageInputLayer([res res 2], 'Name', 'input');
 
 % Encoder
 enc1 = [
-    convolution2dLayer(3, res * 2, 'Padding', 'same', 'Name', 'enc1_conv1') % starts with 64 filters instead of 32 
+    convolution2dLayer(3, 64, 'Padding', 'same', 'Name', 'enc1_conv1') % starts with 64 filters
     batchNormalizationLayer('Name', 'enc1_bn1')
     reluLayer('Name', 'enc1_relu1')
     
-    convolution2dLayer(3, res * 2, 'Padding', 'same', 'Name', 'enc1_conv2')
+    convolution2dLayer(3, 64, 'Padding', 'same', 'Name', 'enc1_conv2')
     batchNormalizationLayer('Name', 'enc1_bn2')
     reluLayer('Name', 'enc1_relu2')
 
@@ -86,11 +89,11 @@ enc1 = [
 ];
 
 enc2 = [
-    convolution2dLayer(3, res * 4, 'Padding', 'same', 'Name', 'enc2_conv1')
+    convolution2dLayer(3, 128, 'Padding', 'same', 'Name', 'enc2_conv1')
     batchNormalizationLayer('Name', 'enc2_bn1')
     reluLayer('Name', 'enc2_relu1')
 
-    convolution2dLayer(3, res * 4, 'Padding', 'same', 'Name', 'enc2_conv2')
+    convolution2dLayer(3, 128, 'Padding', 'same', 'Name', 'enc2_conv2')
     batchNormalizationLayer('Name', 'enc2_bn2')
     reluLayer('Name', 'enc2_relu2')
 
@@ -98,11 +101,11 @@ enc2 = [
 ];
 
 enc3 = [
-    convolution2dLayer(3, res * 8, 'Padding', 'same', 'Name', 'enc3_conv1')
+    convolution2dLayer(3, 256, 'Padding', 'same', 'Name', 'enc3_conv1')
     batchNormalizationLayer('Name', 'enc3_bn1')
     reluLayer('Name', 'enc3_relu1')
 
-    convolution2dLayer(3, res * 8, 'Padding', 'same', 'Name', 'enc3_conv2')
+    convolution2dLayer(3, 256, 'Padding', 'same', 'Name', 'enc3_conv2')
     batchNormalizationLayer('Name', 'enc3_bn2')
     reluLayer('Name', 'enc3_relu2')
 
@@ -110,11 +113,11 @@ enc3 = [
 ];
 
 enc4 = [
-    convolution2dLayer(3, res * 16, 'Padding', 'same', 'Name', 'enc4_conv1')
+    convolution2dLayer(3, 512, 'Padding', 'same', 'Name', 'enc4_conv1')
     batchNormalizationLayer('Name', 'enc4_bn1')
     reluLayer('Name', 'enc4_relu1')
 
-    convolution2dLayer(3, res * 16, 'Padding','same', 'Name', 'enc4_conv2')
+    convolution2dLayer(3, 512, 'Padding','same', 'Name', 'enc4_conv2')
     batchNormalizationLayer('Name', 'enc4_bn2')
     reluLayer('Name', 'enc4_relu2')
 
@@ -123,72 +126,73 @@ enc4 = [
 
 % Bottleneck
 bottleneck = [
-    convolution2dLayer(3, res * 32, 'Padding', 'same', 'Name', 'bottleneck_conv1')
+    convolution2dLayer(3, 1024, 'Padding', 'same', 'Name', 'bottleneck_conv1')
     batchNormalizationLayer('Name', 'bottleneck_bn1')
     reluLayer('Name', 'bottleneck_relu1')
     
-    convolution2dLayer(3, res * 32, 'Padding', 'same', 'Name', 'bottleneck_conv2')
+    convolution2dLayer(3, 1024, 'Padding', 'same', 'Name', 'bottleneck_conv2')
     batchNormalizationLayer('Name', 'bottleneck_bn2')
     reluLayer('Name', 'bottleneck_relu2')
 
     dropoutLayer(percent, 'Name', 'bottleneck_dropout') 
 
-    transposedConv2dLayer(2, res * 32, 'Stride', 2, 'Name', 'bottleneck_up')
-    reluLayer('Name', 'bottleneck_relu3')
 ];
 
 % Decoder
 dec4 = [
-    depthConcatenationLayer(2, 'Name', 'dec4_concat')
-    convolution2dLayer(3, res * 16, 'Padding', 'same', 'Name', 'dec4_conv1')
-    batchNormalizationLayer('Name', 'dec4_bn1')
+    transposedConv2dLayer(2, 512, 'Stride', 2, 'Name', 'dec4_up')
     reluLayer('Name', 'dec4_relu1')
-
-    convolution2dLayer(3, res * 16, 'Padding', 'same', 'Name', 'dec4_conv2')
-    batchNormalizationLayer('Name', 'dec4_bn2')
+    depthConcatenationLayer(2, 'Name', 'dec4_concat')
+    
+    convolution2dLayer(3, 512, 'Padding', 'same', 'Name', 'dec4_conv1')
+    batchNormalizationLayer('Name', 'dec4_bn1')
     reluLayer('Name', 'dec4_relu2')
 
-    transposedConv2dLayer(2, res * 16, 'Stride', 2, 'Name', 'dec4_up')
+    convolution2dLayer(3, 512, 'Padding', 'same', 'Name', 'dec4_conv2')
+    batchNormalizationLayer('Name', 'dec4_bn2')
     reluLayer('Name', 'dec4_relu3')
 ];
 
 dec3 = [
-    depthConcatenationLayer(2, 'Name', 'dec3_concat')
-    convolution2dLayer(3, res * 8, 'Padding', 'same', 'Name', 'dec3_conv1')
-    batchNormalizationLayer('Name', 'dec3_bn1')
+    transposedConv2dLayer(2, 256, 'Stride', 2, 'Name', 'dec3_up')
     reluLayer('Name', 'dec3_relu1')
-
-    convolution2dLayer(3, res * 8, 'Padding', 'same', 'Name', 'dec3_conv2')
-    batchNormalizationLayer('Name', 'dec3_bn2')
+    depthConcatenationLayer(2, 'Name', 'dec3_concat')
+    
+    convolution2dLayer(3, 256, 'Padding', 'same', 'Name', 'dec3_conv1')
+    batchNormalizationLayer('Name', 'dec3_bn1')
     reluLayer('Name', 'dec3_relu2')
 
-    transposedConv2dLayer(2, res * 4, 'Stride', 2, 'Name', 'dec3_up')
+    convolution2dLayer(3, 256, 'Padding', 'same', 'Name', 'dec3_conv2')
+    batchNormalizationLayer('Name', 'dec3_bn2')
     reluLayer('Name', 'dec3_relu3')
 ];
 
 dec2 = [
-    depthConcatenationLayer(2, 'Name', 'dec2_concat')
-    convolution2dLayer(3, res * 4, 'Padding', 'same', 'Name', 'dec2_conv1')
-    batchNormalizationLayer('Name', 'dec2_bn1')
+    transposedConv2dLayer(2, 128, 'Stride', 2, 'Name', 'dec2_up')
     reluLayer('Name', 'dec2_relu1')
-
-    convolution2dLayer(3, res * 4, 'Padding', 'same', 'Name', 'dec2_conv2')
-    batchNormalizationLayer('Name', 'dec2_bn2')
+    depthConcatenationLayer(2, 'Name', 'dec2_concat')
+    
+    convolution2dLayer(3, 128, 'Padding', 'same', 'Name', 'dec2_conv1')
+    batchNormalizationLayer('Name', 'dec2_bn1')
     reluLayer('Name', 'dec2_relu2')
 
-    transposedConv2dLayer(2, res * 2, 'Stride', 2, 'Name', 'dec2_up')
+    convolution2dLayer(3, 128, 'Padding', 'same', 'Name', 'dec2_conv2')
+    batchNormalizationLayer('Name', 'dec2_bn2')
     reluLayer('Name', 'dec2_relu3')
 ];
 
 dec1 = [
-    depthConcatenationLayer(2, 'Name', 'dec1_concat')
-    convolution2dLayer(3, res * 2, 'Padding', 'same', 'Name', 'dec1_conv1')
-    batchNormalizationLayer('Name', 'dec1_bn1')
+    transposedConv2dLayer(2, 64, 'Stride', 2, 'Name', 'dec1_up')
     reluLayer('Name', 'dec1_relu1')
-
-    convolution2dLayer(3, res * 2, 'Padding', 'same', 'Name', 'dec1_conv2')
-    batchNormalizationLayer('Name', 'dec1_bn2')
+    depthConcatenationLayer(2, 'Name', 'dec1_concat')
+    
+    convolution2dLayer(3, 64, 'Padding', 'same', 'Name', 'dec1_conv1')
+    batchNormalizationLayer('Name', 'dec1_bn1')
     reluLayer('Name', 'dec1_relu2')
+
+    convolution2dLayer(3, 64, 'Padding', 'same', 'Name', 'dec1_conv2')
+    batchNormalizationLayer('Name', 'dec1_bn2')
+    reluLayer('Name', 'dec1_relu3')
 ];
 
 % Output
@@ -220,7 +224,7 @@ lgraph = connectLayers(lgraph, 'enc3_pool', 'enc4_conv1');
 lgraph = connectLayers(lgraph, 'enc4_pool', 'bottleneck_conv1');
 
 % Decoder connections with skip connections
-lgraph = connectLayers(lgraph, 'bottleneck_relu3', 'dec4_concat/in1');
+lgraph = connectLayers(lgraph, 'bottleneck_dropout', 'dec4_concat/in1');
 lgraph = connectLayers(lgraph, 'enc4_relu2', 'dec4_concat/in2');
 lgraph = connectLayers(lgraph, 'dec4_relu3', 'dec3_concat/in1');
 lgraph = connectLayers(lgraph, 'enc3_relu2', 'dec3_concat/in2');
@@ -230,7 +234,7 @@ lgraph = connectLayers(lgraph, 'dec2_relu3', 'dec1_concat/in1');
 lgraph = connectLayers(lgraph, 'enc1_relu2', 'dec1_concat/in2');
 
 % Output connection
-lgraph = connectLayers(lgraph, 'dec1_relu2', 'final_conv');
+lgraph = connectLayers(lgraph, 'dec1_relu3', 'final_conv');
 
 % analyzeNetwork(lgraph) % shows networks structure 
 
@@ -255,4 +259,5 @@ save('unet.mat', 'net', 'info', 'elapsedTime');
 
 % Displaying a confirmation message
 disp('Done.');
+
 
